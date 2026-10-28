@@ -51,4 +51,27 @@ class ApiClient {
     }
     return jsonDecode(res.body) as Map<String, dynamic>;
   }
+
+  static Future<List<dynamic>> searchProfilesByPhone(String phone) async {
+    final res = await http.get(
+      Uri.parse('${apiBaseUrl}beneficiary-profiles/search?phone=$phone'),
+      headers: _headers(),
+    );
+    if (res.statusCode != 200) return [];
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    return body['results'] as List<dynamic>;
+  }
+
+  // BeneficiaryProfileController::sync — idempotent via client_uuid.
+  static Future<Map<String, dynamic>> syncProfiles(List<Map<String, dynamic>> profiles) async {
+    final res = await http.post(
+      Uri.parse('${apiBaseUrl}beneficiary-profiles/sync'),
+      headers: _headers(json: true),
+      body: jsonEncode({'profiles': profiles}),
+    );
+    if (res.statusCode != 200) {
+      throw Exception('Profile sync failed (${res.statusCode}): ${res.body}');
+    }
+    return jsonDecode(res.body) as Map<String, dynamic>;
+  }
 }

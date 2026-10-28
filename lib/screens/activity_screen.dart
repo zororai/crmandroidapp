@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../db/repository.dart';
 import 'capture_screen.dart';
 import 'login_screen.dart';
+import 'profile_screen.dart';
 
 // The "New attendance register" screen — captures the paper form's header
 // row (activity name, date, compiled by, reviewed by), then hands off to
@@ -61,6 +62,11 @@ class _ActivityScreenState extends State<ActivityScreen> {
     _loadState(); // refresh pending count after returning
   }
 
+  Future<void> _openProfiling() async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ProfileScreen()));
+    _loadState(); // refresh pending count after returning
+  }
+
   Future<void> _syncNow() async {
     setState(() => _syncing = true);
     try {
@@ -111,6 +117,10 @@ class _ActivityScreenState extends State<ActivityScreen> {
             TextField(controller: _reviewedByController, decoration: const InputDecoration(labelText: 'Reviewed by')),
             const SizedBox(height: 16),
             FilledButton(onPressed: _startActivity, child: const Text('Start Capturing Beneficiaries')),
+            const SizedBox(height: 24),
+            const Text('Beneficiary Profiling', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            FilledButton.tonal(onPressed: _openProfiling, child: const Text('New Beneficiary Profile')),
             const SizedBox(height: 24),
             Text('Pending sync: $_pendingCount'),
             const SizedBox(height: 8),

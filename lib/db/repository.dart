@@ -89,15 +89,7 @@ class Repository {
     final db = await _dbHelper.database;
     final clientUuid = _uuid.v4();
 
-    String? signaturePath;
-    if (signaturePng != null) {
-      final dir = await getApplicationDocumentsDirectory();
-      final sigDir = Directory(p.join(dir.path, 'signatures'));
-      await sigDir.create(recursive: true);
-      final file = File(p.join(sigDir.path, '$clientUuid.png'));
-      await file.writeAsBytes(signaturePng);
-      signaturePath = file.path;
-    }
+    final signaturePath = await _saveSignature(clientUuid, signaturePng);
 
     await db.insert('attendances', {
       'clientUuid': clientUuid,
@@ -114,14 +106,56 @@ class Repository {
     });
   }
 
+  Future<String?> _saveSignature(String clientUuid, Uint8List? png) async {
+    if (png == null) return null;
+    final dir = await getApplicationDocumentsDirectory();
+    final sigDir = Directory(p.join(dir.path, 'signatures'));
+    await sigDir.create(recursive: true);
+    final file = File(p.join(sigDir.path, '$clientUuid.png'));
+    await file.writeAsBytes(png);
+    return file.path;
+  }
+
+  Future<String?> _readSignatureBase64(String? path) async {
+    if (path == null || !await File(path).exists()) return null;
+    return base64Encode(await File(path).readAsBytes());
+  }
+
   Future<List<Map<String, dynamic>>> findLocalByPhone(String phone) async {
     final db = await _dbHelper.database;
     return db.query('attendances', where: 'phoneNumber = ?', whereArgs: [phone], orderBy: 'capturedAt DESC');
   }
 
+  // ── Profiles (Beneficiary Profiling Tool) ──
+
+  // `answers` is already keyed the way BeneficiaryProfileController::sync
+  // expects (full_name, phone_number, skill_interests, ...).
+  Future<void> captureProfile({required Map<String, dynamic> answers, Uint8List? signaturePng}) async {
+    final db = await _dbHelper.database;
+    final clientUuid = _uuid.v4();
+    final signaturePath = await _saveSignature(clientUuid, signaturePng);
+
+    await db.insert('profiles', {
+      'clientUuid': clientUuid,
+      'fullName': answers['full_name'],
+      'phoneNumber': answers['phone_number'],
+      'data': jsonEncode(answers),
+      'signaturePath': signaturePath,
+      'capturedAt': DateTime.now().toIso8601String(),
+      'synced': 0,
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> findLocalProfilesByPhone(String phone) async {
+    final db = await _dbHelper.database;
+    return db.query('profiles', where: 'phoneNumber = ?', whereArgs: [phone], orderBy: 'capturedAt DESC');
+  }
+
   Future<int> pendingSyncCount() async {
     final db = await _dbHelper.database;
-    final result = await db.rawQuery('SELECT COUNT(*) as c FROM attendances WHERE synced = 0');
+    final result = await db.rawQuery(
+      'SELECT (SELECT COUNT(*) FROM attendances WHERE synced = 0) + (SELECT COUNT(*) FROM profiles WHERE synced = 0) as c',
+    );
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
@@ -129,6 +163,11 @@ class Repository {
   // Idempotent via client_uuid — safe to call repeatedly (e.g. a manual
   // "Sync Now" tap after a failed attempt).
   Future<void> syncPending() async {
+    await _syncAttendances();
+    await _syncProfiles();
+  }
+
+  Future<void> _syncAttendances() async {
     final db = await _dbHelper.database;
     final unsyncedActivities = await db.query('activities', where: 'synced = 0');
     if (unsyncedActivities.isEmpty) return;
@@ -143,11 +182,7 @@ class Repository {
 
       final attendancePayload = <Map<String, dynamic>>[];
       for (final a in attendances) {
-        String? signatureBase64;
-        final path = a['signaturePath'] as String?;
-        if (path != null && await File(path).exists()) {
-          signatureBase64 = base64Encode(await File(path).readAsBytes());
-        }
+        final signatureBase64 = await _readSignatureBase64(a['signaturePath'] as String?);
 
         attendancePayload.add({
           'client_uuid': a['clientUuid'],
@@ -179,6 +214,30 @@ class Repository {
     for (final activity in unsyncedActivities) {
       batch.update('activities', {'synced': 1}, where: 'clientUuid = ?', whereArgs: [activity['clientUuid']]);
       batch.update('attendances', {'synced': 1}, where: 'activityUuid = ? AND synced = 0', whereArgs: [activity['clientUuid']]);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<void> _syncProfiles() async {
+    final db = await _dbHelper.database;
+    final unsynced = await db.query('profiles', where: 'synced = 0');
+    if (unsynced.isEmpty) return;
+
+    final payload = <Map<String, dynamic>>[];
+    for (final row in unsynced) {
+      payload.add({
+        ...jsonDecode(row['data'] as String) as Map<String, dynamic>,
+        'client_uuid': row['clientUuid'],
+        'captured_at': row['capturedAt'],
+        'signature_base64': await _readSignatureBase64(row['signaturePath'] as String?),
+      });
+    }
+
+    await ApiClient.syncProfiles(payload);
+
+    final batch = db.batch();
+    for (final row in unsynced) {
+      batch.update('profiles', {'synced': 1}, where: 'clientUuid = ?', whereArgs: [row['clientUuid']]);
     }
     await batch.commit(noResult: true);
   }

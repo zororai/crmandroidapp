@@ -5,8 +5,9 @@ import 'package:sqflite/sqflite.dart';
 
 // Same three tables as the native Kotlin/Room version: session (one row,
 // who's logged in), activities (the register header), attendances (each
-// beneficiary row). Everything written here works fully offline — sync
-// is a separate, explicit step against the Laravel API.
+// beneficiary row) — plus profiles (the Beneficiary Profiling Tool form).
+// Everything written here works fully offline — sync is a separate,
+// explicit step against the Laravel API.
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._internal();
   static Database? _db;
@@ -24,7 +25,10 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 1,
+      version: 2,
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) await _createProfilesTable(db);
+      },
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE session (
@@ -63,7 +67,26 @@ class DatabaseHelper {
             synced INTEGER DEFAULT 0
           )
         ''');
+
+        await _createProfilesTable(db);
       },
     );
+  }
+
+  // The profiling form has ~40 answers that only matter to the server, so
+  // they live as one JSON blob (already in the sync payload's snake_case
+  // shape); only the columns needed for lookup are broken out.
+  Future<void> _createProfilesTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE profiles (
+        clientUuid TEXT PRIMARY KEY,
+        fullName TEXT,
+        phoneNumber TEXT,
+        data TEXT,
+        signaturePath TEXT,
+        capturedAt TEXT,
+        synced INTEGER DEFAULT 0
+      )
+    ''');
   }
 }
