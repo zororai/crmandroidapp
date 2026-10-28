@@ -50,6 +50,8 @@ class _LoginScreenState extends State<LoginScreen> {
       final response = await ApiClient.login(email, password);
       await _repo.saveSessionFromLogin(response);
       if (mounted) _goToActivityScreen();
+    } on LoginRejected catch (e) {
+      _showMessage(e.message);
     } catch (e) {
       // No connectivity for first login is expected — the app needs one
       // successful online login before it can work offline, since the

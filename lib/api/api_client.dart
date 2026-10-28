@@ -3,7 +3,9 @@ import 'package:http/http.dart' as http;
 
 // Point this at your CRM server. Use the LAN IP for field devices that
 // won't have DNS for yazcrm.test, e.g. http://192.168.10.149/api/
-const String apiBaseUrl = 'http://192.168.10.149/api/';
+// Local dev (Windows desktop build on the same PC as the CRM):
+const String apiBaseUrl = 'http://yazcrm.test/api/';
+// const String apiBaseUrl = 'http://192.168.10.149/api/';
 
 class ApiClient {
   static String? _token;
@@ -23,7 +25,13 @@ class ApiClient {
       body: jsonEncode({'email': email, 'password': password}),
     );
     if (res.statusCode != 200) {
-      throw Exception('Login failed (${res.statusCode})');
+      // 422 = wrong credentials / bad email, 403 = account disabled. Surface
+      // Laravel's own message rather than just the status code.
+      String? message;
+      try {
+        message = (jsonDecode(res.body) as Map<String, dynamic>)['message'] as String?;
+      } catch (_) {}
+      throw LoginRejected(message ?? 'Login failed (${res.statusCode})');
     }
     return jsonDecode(res.body) as Map<String, dynamic>;
   }
@@ -74,4 +82,13 @@ class ApiClient {
     }
     return jsonDecode(res.body) as Map<String, dynamic>;
   }
+}
+
+// The server answered but refused the login — distinct from being offline.
+class LoginRejected implements Exception {
+  LoginRejected(this.message);
+  final String message;
+
+  @override
+  String toString() => message;
 }
