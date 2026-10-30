@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import '../api/api_client.dart';
 import '../db/repository.dart';
+import '../theme/brand_colors.dart';
 import 'activity_screen.dart';
 
-const _gradientStart = Color(0xFFFFC947);
-const _gradientEnd = Color(0xFFFF8A00);
-const _backgroundColor = Color(0xFFEDE6DC);
+const _gradientStart = brandOrange;
+const _gradientEnd = brandPurple;
+// White matches the logo's own background, so it sits seamlessly on the page.
+const _backgroundColor = Colors.white;
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -30,16 +32,76 @@ class _LoginScreenState extends State<LoginScreen> {
   // Already logged in (session row exists in SQLite) — skip straight to
   // the app, works even with no connectivity.
   Future<void> _checkExistingSession() async {
-    if (await _repo.isLoggedIn()) {
+    if (await _repo.isLoggedIn() && ApiClient.baseUrl != null) {
       await _repo.restoreTokenIntoMemory();
       _goToActivityScreen();
+      return;
     }
+    if (mounted) await _askForServer();
+  }
+
+  Future<void> _askForServer() async {
+    final controller = TextEditingController(text: ApiClient.baseUrl ?? '');
+    String? error;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          void connect() {
+            final url = ApiClient.normalizeBaseUrl(controller.text);
+            if (url == null) {
+              setDialogState(() => error = 'Enter a valid URL or IP address');
+              return;
+            }
+            ApiClient.saveBaseUrl(url);
+            Navigator.of(context).pop();
+          }
+
+          return AlertDialog(
+            title: const Text('Connect to server'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Enter the address of the CRM server.',
+                  style: TextStyle(fontSize: 13, color: Colors.black.withOpacity(0.6)),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: controller,
+                  autofocus: true,
+                  keyboardType: TextInputType.url,
+                  onSubmitted: (_) => connect(),
+                  decoration: InputDecoration(
+                    labelText: 'Server URL or IP',
+                    hintText: 'e.g. 192.168.10.149',
+                    prefixIcon: const Icon(Icons.dns_outlined),
+                    errorText: error,
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              FilledButton(onPressed: connect, child: const Text('CONNECT')),
+            ],
+          );
+        },
+      ),
+    );
+    if (mounted) setState(() {});
   }
 
   Future<void> _login() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
+    if (ApiClient.baseUrl == null) {
+      await _askForServer();
+      return;
+    }
     if (email.isEmpty || password.isEmpty) {
       _showMessage('Enter email and password');
       return;
@@ -129,6 +191,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
+                  Center(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: Image.asset('assets/images/logo.png', height: 120),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
                   const Text(
                     'Login',
                     style: TextStyle(fontSize: 34, fontWeight: FontWeight.bold, color: Colors.black87),
@@ -211,6 +280,17 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                           ),
                         ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: _askForServer,
+                      icon: const Icon(Icons.dns_outlined, size: 16),
+                      label: Text(
+                        ApiClient.baseUrl ?? 'Set server',
+                        style: const TextStyle(fontSize: 12),
                       ),
                     ),
                   ),

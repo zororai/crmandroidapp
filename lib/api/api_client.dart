@@ -1,14 +1,41 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
-// Point this at your CRM server. Use the LAN IP for field devices that
-// won't have DNS for yazcrm.test, e.g. http://192.168.10.149/api/
-// Local dev (Windows desktop build on the same PC as the CRM):
-const String apiBaseUrl = 'http://yazcrm.test/api/';
-// const String apiBaseUrl = 'http://192.168.10.149/api/';
+const _baseUrlPrefKey = 'api_base_url';
 
 class ApiClient {
   static String? _token;
+
+  // Chosen by the user in the server dialog and persisted on the device, so
+  // field devices can point at a LAN IP (e.g. http://192.168.10.149/api/).
+  static String? baseUrl;
+
+  static Future<void> loadBaseUrl() async {
+    final prefs = await SharedPreferences.getInstance();
+    baseUrl = prefs.getString(_baseUrlPrefKey);
+  }
+
+  static Future<void> saveBaseUrl(String url) async {
+    baseUrl = url;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_baseUrlPrefKey, url);
+  }
+
+  // Accepts "192.168.10.149", "yazcrm.test", "http://host/api" etc. and
+  // returns "http://host/api/". Null if it isn't a usable address.
+  static String? normalizeBaseUrl(String input) {
+    var url = input.trim();
+    if (url.isEmpty) return null;
+    if (!url.contains('://')) url = 'http://$url';
+    while (url.endsWith('/')) {
+      url = url.substring(0, url.length - 1);
+    }
+    if (!url.endsWith('/api')) url = '$url/api';
+    final uri = Uri.tryParse(url);
+    if (uri == null || uri.host.isEmpty) return null;
+    return '$url/';
+  }
 
   static void setToken(String? token) => _token = token;
 
@@ -20,7 +47,7 @@ class ApiClient {
 
   static Future<Map<String, dynamic>> login(String email, String password) async {
     final res = await http.post(
-      Uri.parse('${apiBaseUrl}auth/login'),
+      Uri.parse('${baseUrl}auth/login'),
       headers: _headers(json: true),
       body: jsonEncode({'email': email, 'password': password}),
     );
@@ -38,7 +65,7 @@ class ApiClient {
 
   static Future<List<dynamic>> searchByPhone(String phone) async {
     final res = await http.get(
-      Uri.parse('${apiBaseUrl}beneficiary-attendances/search?phone=$phone'),
+      Uri.parse('${baseUrl}beneficiary-attendances/search?phone=$phone'),
       headers: _headers(),
     );
     if (res.statusCode != 200) return [];
@@ -50,7 +77,7 @@ class ApiClient {
   // Laravel side — client_uuid on every record makes a repeated call safe.
   static Future<Map<String, dynamic>> sync(List<Map<String, dynamic>> activities) async {
     final res = await http.post(
-      Uri.parse('${apiBaseUrl}beneficiary-attendances/sync'),
+      Uri.parse('${baseUrl}beneficiary-attendances/sync'),
       headers: _headers(json: true),
       body: jsonEncode({'activities': activities}),
     );
@@ -62,7 +89,7 @@ class ApiClient {
 
   static Future<List<dynamic>> searchProfilesByPhone(String phone) async {
     final res = await http.get(
-      Uri.parse('${apiBaseUrl}beneficiary-profiles/search?phone=$phone'),
+      Uri.parse('${baseUrl}beneficiary-profiles/search?phone=$phone'),
       headers: _headers(),
     );
     if (res.statusCode != 200) return [];
@@ -73,7 +100,7 @@ class ApiClient {
   // BeneficiaryProfileController::sync — idempotent via client_uuid.
   static Future<Map<String, dynamic>> syncProfiles(List<Map<String, dynamic>> profiles) async {
     final res = await http.post(
-      Uri.parse('${apiBaseUrl}beneficiary-profiles/sync'),
+      Uri.parse('${baseUrl}beneficiary-profiles/sync'),
       headers: _headers(json: true),
       body: jsonEncode({'profiles': profiles}),
     );

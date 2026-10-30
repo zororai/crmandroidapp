@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
@@ -106,8 +107,13 @@ class Repository {
     });
   }
 
+  // Signatures are PNG files on device. The browser can't write files, so on
+  // web the PNG is kept inline in signaturePath as a data: URI instead.
+  static const _inlinePrefix = 'data:image/png;base64,';
+
   Future<String?> _saveSignature(String clientUuid, Uint8List? png) async {
     if (png == null) return null;
+    if (kIsWeb) return '$_inlinePrefix${base64Encode(png)}';
     final dir = await getApplicationDocumentsDirectory();
     final sigDir = Directory(p.join(dir.path, 'signatures'));
     await sigDir.create(recursive: true);
@@ -117,7 +123,9 @@ class Repository {
   }
 
   Future<String?> _readSignatureBase64(String? path) async {
-    if (path == null || !await File(path).exists()) return null;
+    if (path == null) return null;
+    if (path.startsWith(_inlinePrefix)) return path.substring(_inlinePrefix.length);
+    if (kIsWeb || !await File(path).exists()) return null;
     return base64Encode(await File(path).readAsBytes());
   }
 
