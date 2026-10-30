@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import 'api/api_client.dart';
+import 'data_collection/sync/background_sync.dart';
+import 'data_collection/sync/sync_coordinator.dart';
 import 'screens/login_screen.dart';
 import 'theme/brand_colors.dart';
 
@@ -20,6 +22,11 @@ void main() async {
   }
   await ApiClient.loadBaseUrl();
   runApp(const BeneficiaryApp());
+
+  // Data collection sync: periodic/after-finalize work on Android, plus
+  // syncing now and whenever connectivity returns while the app is open.
+  await BackgroundSync.initialize();
+  SyncCoordinator.instance.start();
 }
 
 class BeneficiaryApp extends StatelessWidget {

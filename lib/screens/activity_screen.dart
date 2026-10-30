@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../db/repository.dart';
 import 'capture_screen.dart';
-import 'forms_screen.dart';
+import '../data_collection/api/data_collection_api.dart';
+import '../data_collection/screens/forms_list_screen.dart';
+import '../data_collection/screens/sync_ui.dart';
 import 'login_screen.dart';
 import 'profile_screen.dart';
 
@@ -69,7 +71,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
   }
 
   Future<void> _openDataCollection() async {
-    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FormsScreen()));
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FormsListScreen()));
     _loadState(); // refresh pending count after returning
   }
 
@@ -80,6 +82,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sync complete.')));
       }
+    } on AuthExpiredException {
+      if (mounted) await promptReauth(context);
     } catch (e) {
       // Typically no connectivity — not an error the user needs to see in
       // detail, just that it didn't go through this time.
