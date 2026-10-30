@@ -1,0 +1,80 @@
+{
+  "form_id": 9001,
+  "title": "Household Survey (sample)",
+  "version": "2026103001",
+  "survey": [
+    {"type": "note", "name": "intro", "label": "Introduce yourself and explain the purpose of the survey before asking for consent."},
+    {"type": "select_one yes_no", "name": "consent", "label": "Does the respondent agree to take part?", "required": "yes"},
+    {"type": "note", "name": "no_consent", "label": "Thank the respondent and end the interview.", "relevant": "${consent} = 'no'"},
+
+    {"type": "begin_group", "name": "household", "label": "Household", "relevant": "${consent} = 'yes'"},
+    {"type": "date", "name": "interview_date", "label": "Interview date", "default": "today()", "required": "yes",
+     "constraint": ". <= today()", "constraint_message": "The interview date can't be in the future."},
+    {"type": "text", "name": "head_name", "label": "Name of household head", "required": "yes"},
+    {"type": "select_one district", "name": "district", "label": "District", "required": "yes"},
+    {"type": "text", "name": "district_other", "label": "Which district?", "required": "yes", "relevant": "${district} = 'other'"},
+    {"type": "geopoint", "name": "location", "label": "Household location", "hint": "Stand at the main entrance."},
+    {"type": "select_one water", "name": "water_source", "label": "Main source of drinking water"},
+    {"type": "photo", "name": "house_photo", "label": "Photo of the dwelling"},
+    {"type": "end_group"},
+
+    {"type": "begin_repeat", "name": "members", "label": "Household member", "relevant": "${consent} = 'yes'"},
+    {"type": "text", "name": "member_name", "label": "Name", "required": "yes"},
+    {"type": "integer", "name": "member_age", "label": "Age (years)", "required": "yes",
+     "constraint": ". >= 0 and . <= 120", "constraint_message": "Age must be between 0 and 120."},
+    {"type": "select_one sex", "name": "member_sex", "label": "Sex", "required": "yes"},
+    {"type": "select_one yes_no", "name": "in_school", "label": "Is ${member_name} attending school?",
+     "relevant": "${member_age} >= 5 and ${member_age} <= 18"},
+    {"type": "text", "name": "school_name", "label": "School name", "relevant": "${in_school} = 'yes'"},
+    {"type": "calculate", "name": "is_adult", "calculation": "if(${member_age} >= 18, 1, 0)"},
+    {"type": "end_repeat"},
+
+    {"type": "begin_group", "name": "livelihoods", "label": "Livelihoods", "relevant": "${consent} = 'yes'"},
+    {"type": "calculate", "name": "member_count", "calculation": "count(${members})"},
+    {"type": "calculate", "name": "adult_count", "calculation": "sum(${is_adult})"},
+    {"type": "note", "name": "member_summary", "label": "You recorded ${member_count} household member(s), ${adult_count} of them adults."},
+    {"type": "select_multiple income", "name": "income_sources", "label": "Sources of household income",
+     "constraint": "not(selected(., 'none') and count-selected(.) > 1)",
+     "constraint_message": "\"None\" can't be combined with other sources."},
+    {"type": "text", "name": "income_other", "label": "Other income source", "required": "yes",
+     "relevant": "selected(${income_sources}, 'other')"},
+    {"type": "decimal", "name": "monthly_income", "label": "Total monthly income (USD)",
+     "relevant": "not(selected(${income_sources}, 'none')) and count-selected(${income_sources}) > 0",
+     "constraint": ". >= 0", "constraint_message": "Income can't be negative."},
+    {"type": "calculate", "name": "income_per_member",
+     "calculation": "if(${member_count} > 0 and ${monthly_income} != '', round(${monthly_income} div ${member_count}, 2), '')"},
+    {"type": "time", "name": "end_time", "label": "Time the interview ended"},
+    {"type": "end_group"}
+  ],
+  "choices": {
+    "yes_no": [
+      {"name": "yes", "label": "Yes"},
+      {"name": "no", "label": "No"}
+    ],
+    "district": [
+      {"name": "harare", "label": "Harare"},
+      {"name": "bulawayo", "label": "Bulawayo"},
+      {"name": "mutare", "label": "Mutare"},
+      {"name": "gweru", "label": "Gweru"},
+      {"name": "other", "label": "Other"}
+    ],
+    "water": [
+      {"name": "piped", "label": "Piped water"},
+      {"name": "borehole", "label": "Borehole"},
+      {"name": "well", "label": "Protected well"},
+      {"name": "surface", "label": "River / dam"}
+    ],
+    "sex": [
+      {"name": "female", "label": "Female"},
+      {"name": "male", "label": "Male"}
+    ],
+    "income": [
+      {"name": "farming", "label": "Farming"},
+      {"name": "business", "label": "Small business"},
+      {"name": "wages", "label": "Wages / salary"},
+      {"name": "remittances", "label": "Remittances"},
+      {"name": "other", "label": "Other"},
+      {"name": "none", "label": "None"}
+    ]
+  }
+}

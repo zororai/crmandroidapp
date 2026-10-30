@@ -8,6 +8,8 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 import '../api/api_client.dart';
+import '../data_collection/api/data_collection_api.dart';
+import '../data_collection/sync/sync_coordinator.dart';
 import 'database_helper.dart';
 
 const _uuid = Uuid();
@@ -43,16 +45,21 @@ class Repository {
 
   Future<bool> isLoggedIn() async => await getCurrentUser() != null;
 
+  // The API token for the logged-in user. Everything that needs it reads it
+  // through here (including the background sync isolate), so where it's
+  // stored can change in one place.
+  Future<String?> readToken() async => (await getCurrentUser())?['token'] as String?;
+
   Future<void> restoreTokenIntoMemory() async {
-    final user = await getCurrentUser();
-    ApiClient.setToken(user?['token'] as String?);
+    ApiClient.setToken(await readToken());
   }
 
   Future<void> logout() async {
     final db = await _dbHelper.database;
     await db.delete('session');
-    // Assignments belong to the user who downloaded them.
-    await db.delete('forms');
+    // Form assignments belong to the user who downloaded them. Their
+    // unsent submissions stay, locked to that user (see LoginScreen).
+    await db.delete('dc_forms');
     ApiClient.setToken(null);
   }
 
@@ -165,7 +172,8 @@ class Repository {
     final db = await _dbHelper.database;
     final result = await db.rawQuery(
       'SELECT (SELECT COUNT(*) FROM attendances WHERE synced = 0) + (SELECT COUNT(*) FROM profiles WHERE synced = 0)'
-      " + (SELECT COUNT(*) FROM submissions WHERE status = 'ready') as c",
+      " + (SELECT COUNT(*) FROM dc_submissions WHERE status IN ('finalized', 'syncing')"
+      ' AND ownerUserId = (SELECT userId FROM session WHERE id = 1)) as c',
     );
     return Sqflite.firstIntValue(result) ?? 0;
   }
@@ -176,7 +184,10 @@ class Repository {
   Future<void> syncPending() async {
     await _syncAttendances();
     await _syncProfiles();
-    await _syncSubmissions();
+
+    final report = await SyncCoordinator.instance.sync(force: true);
+    if (report.authExpired) throw AuthExpiredException();
+    if (report.error != null) throw Exception(report.error);
   }
 
   Future<void> _syncAttendances() async {
@@ -250,123 +261,6 @@ class Repository {
     final batch = db.batch();
     for (final row in unsynced) {
       batch.update('profiles', {'synced': 1}, where: 'clientUuid = ?', whereArgs: [row['clientUuid']]);
-    }
-    await batch.commit(noResult: true);
-  }
-
-  // ── Data collection (Kobo-style forms assigned in the CRM) ──
-
-  // Replaces the local copy with what the server currently assigns. Drafts
-  // and unsynced submissions are kept — they reference assignmentId only.
-  Future<int> downloadForms() async {
-    final assignments = await ApiClient.myForms();
-    final db = await _dbHelper.database;
-    final now = DateTime.now().toIso8601String();
-
-    final batch = db.batch();
-    batch.delete('forms');
-    for (final a in assignments.cast<Map<String, dynamic>>()) {
-      final schema = a['schema'];
-      batch.insert('forms', {
-        'assignmentId': a['assignment_id'],
-        'formName': a['form_name'],
-        'formDescription': a['form_description'],
-        'projectName': a['project_name'],
-        'versionLabel': a['version_label'],
-        'schema': schema is String ? schema : jsonEncode(schema),
-        'dueDate': a['due_date'],
-        'downloadedAt': now,
-      });
-    }
-    await batch.commit(noResult: true);
-    return assignments.length;
-  }
-
-  Future<List<Map<String, dynamic>>> getForms() async {
-    final db = await _dbHelper.database;
-    return db.query('forms', orderBy: 'formName');
-  }
-
-  Future<List<Map<String, dynamic>>> getSubmissions(int assignmentId) async {
-    final db = await _dbHelper.database;
-    return db.query('submissions', where: 'assignmentId = ?', whereArgs: [assignmentId], orderBy: 'updatedAt DESC');
-  }
-
-  // Counts per status for one form, e.g. {'draft': 2, 'ready': 1}.
-  Future<Map<String, int>> submissionCounts(int assignmentId) async {
-    final db = await _dbHelper.database;
-    final rows = await db.rawQuery(
-      'SELECT status, COUNT(*) as c FROM submissions WHERE assignmentId = ? GROUP BY status',
-      [assignmentId],
-    );
-    return {for (final r in rows) r['status'] as String: r['c'] as int};
-  }
-
-  // Creates the submission when uid is null. finalize = true queues it for
-  // sync; otherwise it stays an editable draft.
-  Future<String> saveSubmission({
-    String? uid,
-    required int assignmentId,
-    required String formName,
-    required Map<String, dynamic> answers,
-    required bool finalize,
-  }) async {
-    final db = await _dbHelper.database;
-    final now = DateTime.now().toIso8601String();
-    final row = {
-      'answers': jsonEncode(answers),
-      'status': finalize ? 'ready' : 'draft',
-      'errorMessage': null,
-      'updatedAt': now,
-    };
-
-    if (uid != null) {
-      await db.update('submissions', row, where: 'submissionUid = ?', whereArgs: [uid]);
-      return uid;
-    }
-
-    final newUid = _uuid.v4();
-    await db.insert('submissions', {
-      ...row,
-      'submissionUid': newUid,
-      'assignmentId': assignmentId,
-      'formName': formName,
-      'startedAt': now,
-    });
-    return newUid;
-  }
-
-  Future<void> deleteSubmission(String uid) async {
-    final db = await _dbHelper.database;
-    await db.delete('submissions', where: 'submissionUid = ?', whereArgs: [uid]);
-  }
-
-  Future<void> _syncSubmissions() async {
-    final db = await _dbHelper.database;
-    final ready = await db.query('submissions', where: "status = 'ready'");
-    if (ready.isEmpty) return;
-
-    final results = await ApiClient.syncSubmissions([
-      for (final row in ready)
-        {
-          'submission_uid': row['submissionUid'],
-          'assignment_id': row['assignmentId'],
-          'answers': jsonDecode(row['answers'] as String),
-          'started_at': row['startedAt'],
-        },
-    ]);
-
-    // created/skipped both mean the server has it; failed goes back to the
-    // user with the server's reason so it can be corrected.
-    final batch = db.batch();
-    for (final r in results.cast<Map<String, dynamic>>()) {
-      final failed = r['status'] == 'failed';
-      batch.update(
-        'submissions',
-        {'status': failed ? 'failed' : 'synced', 'errorMessage': failed ? r['message'] : null},
-        where: 'submissionUid = ?',
-        whereArgs: [r['submission_uid']],
-      );
     }
     await batch.commit(noResult: true);
   }

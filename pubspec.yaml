@@ -34,3 +34,4 @@ flutter:
 
   assets:
     - assets/images/logo.png
+    - assets/data_collection/household_survey.json

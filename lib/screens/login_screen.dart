@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../api/api_client.dart';
+import '../data_collection/db/data_collection_store.dart';
+import '../data_collection/media/media_files.dart';
 import '../db/repository.dart';
 import '../theme/brand_colors.dart';
 import 'activity_screen.dart';
@@ -9,8 +11,13 @@ const _gradientEnd = brandPurple;
 // White matches the logo's own background, so it sits seamlessly on the page.
 const _backgroundColor = Colors.white;
 
+// reauth: opened over the app when the token has expired (401 during data
+// collection sync). Skips the auto-login and server prompt, and pops with
+// true on success instead of replacing the app.
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.reauth = false});
+
+  final bool reauth;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -26,7 +33,16 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _checkExistingSession();
+    if (widget.reauth) {
+      _prefillEmail();
+    } else {
+      _checkExistingSession();
+    }
+  }
+
+  Future<void> _prefillEmail() async {
+    final user = await _repo.getCurrentUser();
+    if (user != null) _emailController.text = user['email'] as String? ?? '';
   }
 
   // Already logged in (session row exists in SQLite) — skip straight to
@@ -111,8 +127,14 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _loading = true);
     try {
       final response = await ApiClient.login(email, password);
+      if (!await _resolveQueuedSubmissions(response['user'] as Map<String, dynamic>)) return;
       await _repo.saveSessionFromLogin(response);
-      if (mounted) _goToActivityScreen();
+      if (!mounted) return;
+      if (widget.reauth) {
+        Navigator.of(context).pop(true);
+      } else {
+        _goToActivityScreen();
+      }
     } on LoginRejected catch (e) {
       _showMessage(e.message);
     } catch (e) {
@@ -123,6 +145,54 @@ class _LoginScreenState extends State<LoginScreen> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  // Unsent data collection submissions belong to the user who collected
+  // them and are only ever sent under that account. If someone else logs in
+  // on this device, they choose: keep them locked to the original user, or
+  // discard them. Returns false to cancel the login.
+  Future<bool> _resolveQueuedSubmissions(Map<String, dynamic> user) async {
+    final store = await DataCollectionStore.open();
+    for (final other in await store.queuedForOtherOwners(user['id'] as int)) {
+      if (!mounted) return false;
+      final owner = other.ownerName.isEmpty ? 'another user' : other.ownerName;
+      final choice = await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: Text('Unsent forms from $owner'),
+          content: Text(
+            'This device has ${other.count} form submission(s) collected by $owner that have not been sent. '
+            'They can only be sent from $owner\'s account.\n\n'
+            'Keep them for $owner to send later, or discard them permanently?',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel login')),
+            TextButton(onPressed: () => Navigator.pop(context, 'discard'), child: const Text('Discard')),
+            FilledButton(onPressed: () => Navigator.pop(context, 'keep'), child: Text('Keep for $owner')),
+          ],
+        ),
+      );
+      if (choice == null || !mounted) return false;
+      if (choice == 'discard') {
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('Discard ${other.count} submission(s)?'),
+            content: Text('$owner\'s unsent forms and photos will be deleted from this device. This can\'t be undone.'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Back')),
+              FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Discard')),
+            ],
+          ),
+        );
+        if (confirmed != true) return false;
+        for (final path in await store.discardQueue(other.ownerUserId)) {
+          await const MediaFiles().delete(path);
+        }
+      }
+    }
+    return true;
   }
 
   void _goToActivityScreen() {
@@ -211,8 +281,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         const SizedBox(height: 32),
-                        const Text(
-                          'Login',
+                        Text(
+                          widget.reauth ? 'Log in again' : 'Login',
                           style: TextStyle(
                               fontSize: 34,
                               fontWeight: FontWeight.bold,
@@ -220,7 +290,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          'Please sign in to continue',
+                          widget.reauth
+                              ? 'Your session expired. Unsent forms are safe on this device.'
+                              : 'Please sign in to continue',
                           style: TextStyle(
                               fontSize: 14,
                               color: Colors.black.withOpacity(0.5)),
@@ -324,6 +396,13 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ),
+                        if (widget.reauth)
+                          Center(
+                            child: TextButton(
+                              onPressed: () => Navigator.of(context).pop(false),
+                              child: const Text('Not now'),
+                            ),
+                          ),
                       ],
                     ),
                   ),
