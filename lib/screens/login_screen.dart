@@ -66,7 +66,8 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 Text(
                   'Enter the address of the CRM server.',
-                  style: TextStyle(fontSize: 13, color: Colors.black.withOpacity(0.6)),
+                  style: TextStyle(
+                      fontSize: 13, color: Colors.black.withOpacity(0.6)),
                 ),
                 const SizedBox(height: 16),
                 TextField(
@@ -131,7 +132,8 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -178,123 +180,154 @@ class _LoginScreenState extends State<LoginScreen> {
                       end: Alignment.bottomRight,
                     ),
                     boxShadow: [
-                      BoxShadow(color: _gradientEnd.withOpacity(0.3), blurRadius: 30, offset: const Offset(0, 15)),
+                      BoxShadow(
+                          color: _gradientEnd.withOpacity(0.3),
+                          blurRadius: 30,
+                          offset: const Offset(0, 15)),
                     ],
                   ),
                 ),
               ),
             ),
 
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 60),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Center(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: Image.asset('assets/images/logo.png', height: 120),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  const Text(
-                    'Login',
-                    style: TextStyle(fontSize: 34, fontWeight: FontWeight.bold, color: Colors.black87),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Please sign in to continue',
-                    style: TextStyle(fontSize: 14, color: Colors.black.withOpacity(0.5)),
-                  ),
-                  const SizedBox(height: 40),
-
-                  _buildLabeledField(
-                    label: 'EMAIL',
-                    icon: Icons.email_outlined,
-                    child: TextField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(border: InputBorder.none, isDense: true),
-                    ),
-                  ),
-                  const SizedBox(height: 22),
-
-                  _buildLabeledField(
-                    label: 'PASSWORD',
-                    icon: Icons.lock_outline,
-                    trailing: TextButton(
-                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                      style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
-                      child: Text(
-                        _obscurePassword ? 'SHOW' : 'HIDE',
-                        style: const TextStyle(fontSize: 11, color: _gradientEnd, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    child: TextField(
-                      controller: _passwordController,
-                      obscureText: _obscurePassword,
-                      decoration: const InputDecoration(border: InputBorder.none, isDense: true),
-                    ),
-                  ),
-
-                  const SizedBox(height: 40),
-
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(26),
-                        gradient: const LinearGradient(colors: [_gradientStart, _gradientEnd]),
-                        boxShadow: [
-                          BoxShadow(color: _gradientEnd.withOpacity(0.4), blurRadius: 16, offset: const Offset(0, 8)),
-                        ],
-                      ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(26),
-                          onTap: _loading ? null : _login,
-                          child: Center(
-                            child: _loading
-                                ? const SizedBox(
-                                    width: 22,
-                                    height: 22,
-                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                  )
-                                : const Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        'LOGIN',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                          letterSpacing: 1,
-                                        ),
-                                      ),
-                                      SizedBox(width: 8),
-                                      Icon(Icons.arrow_forward, color: Colors.white, size: 18),
-                                    ],
-                                  ),
+            // Scrolls on short screens (small phones, keyboard open, short
+            // browser windows) instead of overflowing; centred otherwise.
+            LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 28, vertical: 32),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Center(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(20),
+                            child: Image.asset('assets/images/logo.png',
+                                height: 120),
                           ),
                         ),
-                      ),
+                        const SizedBox(height: 32),
+                        const Text(
+                          'Login',
+                          style: TextStyle(
+                              fontSize: 34,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Please sign in to continue',
+                          style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.black.withOpacity(0.5)),
+                        ),
+                        const SizedBox(height: 40),
+                        _buildLabeledField(
+                          label: 'EMAIL',
+                          icon: Icons.email_outlined,
+                          child: TextField(
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            decoration: const InputDecoration(
+                                border: InputBorder.none, isDense: true),
+                          ),
+                        ),
+                        const SizedBox(height: 22),
+                        _buildLabeledField(
+                          label: 'PASSWORD',
+                          icon: Icons.lock_outline,
+                          trailing: TextButton(
+                            onPressed: () => setState(
+                                () => _obscurePassword = !_obscurePassword),
+                            style: TextButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                minimumSize: Size.zero),
+                            child: Text(
+                              _obscurePassword ? 'SHOW' : 'HIDE',
+                              style: const TextStyle(
+                                  fontSize: 11,
+                                  color: _gradientEnd,
+                                  fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          child: TextField(
+                            controller: _passwordController,
+                            obscureText: _obscurePassword,
+                            decoration: const InputDecoration(
+                                border: InputBorder.none, isDense: true),
+                          ),
+                        ),
+                        const SizedBox(height: 40),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(26),
+                              gradient: const LinearGradient(
+                                  colors: [_gradientStart, _gradientEnd]),
+                              boxShadow: [
+                                BoxShadow(
+                                    color: _gradientEnd.withOpacity(0.4),
+                                    blurRadius: 16,
+                                    offset: const Offset(0, 8)),
+                              ],
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(26),
+                                onTap: _loading ? null : _login,
+                                child: Center(
+                                  child: _loading
+                                      ? const SizedBox(
+                                          width: 22,
+                                          height: 22,
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.white),
+                                        )
+                                      : const Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Text(
+                                              'LOGIN',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                                letterSpacing: 1,
+                                              ),
+                                            ),
+                                            SizedBox(width: 8),
+                                            Icon(Icons.arrow_forward,
+                                                color: Colors.white, size: 18),
+                                          ],
+                                        ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Center(
+                          child: TextButton.icon(
+                            onPressed: _askForServer,
+                            icon: const Icon(Icons.dns_outlined, size: 16),
+                            label: Text(
+                              ApiClient.baseUrl ?? 'Set server',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  Center(
-                    child: TextButton.icon(
-                      onPressed: _askForServer,
-                      icon: const Icon(Icons.dns_outlined, size: 16),
-                      label: Text(
-                        ApiClient.baseUrl ?? 'Set server',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ],
@@ -314,7 +347,11 @@ class _LoginScreenState extends State<LoginScreen> {
       children: [
         Text(
           label,
-          style: TextStyle(fontSize: 11, color: Colors.black.withOpacity(0.4), fontWeight: FontWeight.w600, letterSpacing: 0.5),
+          style: TextStyle(
+              fontSize: 11,
+              color: Colors.black.withOpacity(0.4),
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5),
         ),
         const SizedBox(height: 6),
         Row(
