@@ -7,7 +7,7 @@ import 'package:sqflite/sqflite.dart';
 // Same three tables as the native Kotlin/Room version: session (one row,
 // who's logged in), activities (the register header), attendances (each
 // beneficiary row) — plus profiles (the Beneficiary Profiling Tool form)
-// and the Kobo-style data collection tables (forms + submissions).
+// and the data collection tables (dc_*, see createDataCollectionTables).
 // Everything written here works fully offline — sync is a separate,
 // explicit step against the Laravel API.
 class DatabaseHelper {
@@ -28,10 +28,20 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 3,
+      version: 4,
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) await _createProfilesTable(db);
-        if (oldVersion < 3) await _createDataCollectionTables(db);
+        if (oldVersion < 4) {
+          // v3 had a first, simpler data collection feature (forms +
+          // submissions). It was pushed but never released, so its tables
+          // are set aside rather than dropped, in case a test device holds
+          // something worth recovering.
+          if (oldVersion == 3) {
+            await db.execute('ALTER TABLE forms RENAME TO legacy_v3_forms');
+            await db.execute('ALTER TABLE submissions RENAME TO legacy_v3_submissions');
+          }
+          await createDataCollectionTables(db);
+        }
       },
       onCreate: (db, version) async {
         await db.execute('''
@@ -73,7 +83,7 @@ class DatabaseHelper {
         ''');
 
         await _createProfilesTable(db);
-        await _createDataCollectionTables(db);
+        await createDataCollectionTables(db);
       },
     );
   }
@@ -94,37 +104,89 @@ class DatabaseHelper {
       )
     ''');
   }
+}
 
-  // forms: the user's CRM form assignments as last downloaded, schema kept as
-  // the raw JSON the server sent. submissions: each filled-in form, answers
-  // as JSON keyed by question id. status: draft (still editing), ready
-  // (finalized, waiting to sync), synced, or failed (server rejected it —
-  // errorMessage says why, and it can be edited and finalized again).
-  Future<void> _createDataCollectionTables(Database db) async {
-    await db.execute('''
-      CREATE TABLE forms (
-        assignmentId INTEGER PRIMARY KEY,
-        formName TEXT,
-        formDescription TEXT,
-        projectName TEXT,
-        versionLabel TEXT,
-        schema TEXT,
-        dueDate TEXT,
-        downloadedAt TEXT
-      )
-    ''');
+// Data collection (KoboToolbox-style forms from the CRM). Public so tests can
+// build the same tables in an in-memory database.
+//  dc_forms         assigned forms: the latest version the server reported,
+//                   and the version cached on the device (update badge when
+//                   they differ)
+//  dc_form_schemas  every downloaded schema version, so a draft started on
+//                   an older version still opens after the form is updated
+//  dc_submissions   one row per filled-in form; also the sync queue (status,
+//                   attempts, nextAttemptAt drive retries)
+//  dc_media         photos, uploaded only after their submission's data
+//  dc_sync_runs     history for the sync status screen
+Future<void> createDataCollectionTables(Database db) async {
+  await db.execute('''
+    CREATE TABLE dc_forms (
+      formId INTEGER PRIMARY KEY,
+      title TEXT,
+      latestVersion TEXT,
+      latestChecksum TEXT,
+      updatedAt TEXT,
+      cachedVersion TEXT,
+      cachedChecksum TEXT
+    )
+  ''');
 
-    await db.execute('''
-      CREATE TABLE submissions (
-        submissionUid TEXT PRIMARY KEY,
-        assignmentId INTEGER,
-        formName TEXT,
-        answers TEXT,
-        status TEXT,
-        errorMessage TEXT,
-        startedAt TEXT,
-        updatedAt TEXT
-      )
-    ''');
-  }
+  await db.execute('''
+    CREATE TABLE dc_form_schemas (
+      formId INTEGER,
+      version TEXT,
+      checksum TEXT,
+      schemaJson TEXT,
+      downloadedAt TEXT,
+      PRIMARY KEY (formId, version)
+    )
+  ''');
+
+  await db.execute('''
+    CREATE TABLE dc_submissions (
+      clientUuid TEXT PRIMARY KEY,
+      formId INTEGER,
+      formVersion TEXT,
+      formTitle TEXT,
+      ownerUserId INTEGER,
+      ownerName TEXT,
+      status TEXT,
+      data TEXT,
+      payload TEXT,
+      lat REAL,
+      lng REAL,
+      startedAt TEXT,
+      updatedAt TEXT,
+      finalizedAt TEXT,
+      sentAt TEXT,
+      dataAccepted INTEGER DEFAULT 0,
+      attempts INTEGER DEFAULT 0,
+      nextAttemptAt TEXT,
+      errorReason TEXT
+    )
+  ''');
+  await db.execute('CREATE INDEX dc_submissions_owner_status ON dc_submissions (ownerUserId, status)');
+
+  await db.execute('''
+    CREATE TABLE dc_media (
+      fileName TEXT PRIMARY KEY,
+      clientUuid TEXT,
+      fieldName TEXT,
+      path TEXT,
+      mimeType TEXT,
+      sizeBytes INTEGER,
+      uploaded INTEGER DEFAULT 0
+    )
+  ''');
+
+  await db.execute('''
+    CREATE TABLE dc_sync_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      startedAt TEXT,
+      finishedAt TEXT,
+      sent INTEGER,
+      failed INTEGER,
+      pending INTEGER,
+      error TEXT
+    )
+  ''');
 }
