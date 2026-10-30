@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../db/repository.dart';
+import '../widgets/app_drawer.dart';
 import 'capture_screen.dart';
 import '../data_collection/api/data_collection_api.dart';
 import '../data_collection/screens/forms_list_screen.dart';
@@ -106,6 +107,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Beneficiary Attendance')),
+      drawer: AppDrawer(onLogout: _logout, onReturn: _loadState),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(

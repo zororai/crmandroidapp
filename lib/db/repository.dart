@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
@@ -14,24 +15,34 @@ import 'database_helper.dart';
 
 const _uuid = Uuid();
 
+// The API token lives in the platform keystore (Android Keystore-backed
+// encryption), not in SQLite, where it would be readable from a rooted
+// phone or a device backup. The session row keeps only who is logged in.
+const _secureStorage = FlutterSecureStorage();
+const _tokenKey = 'api_token';
+
 class Repository {
   final _dbHelper = DatabaseHelper.instance;
 
-  // ── Session (SQLite, not SharedPreferences — same reasoning as the
-  // native app: keep it in the same offline-first store as everything else) ──
+  // ── Session: who is logged in (SQLite, offline-first like everything
+  // else); the token itself is in secure storage ──
 
   Future<void> saveSessionFromLogin(Map<String, dynamic> loginResponse) async {
     final db = await _dbHelper.database;
     final user = loginResponse['user'] as Map<String, dynamic>;
     final token = loginResponse['token'] as String;
 
+    // If secure storage is unavailable (e.g. Chrome on a plain-http address,
+    // where the browser withholds WebCrypto) the token falls back to the
+    // session row so login still works.
+    final stored = await _writeSecureToken(token);
     await db.delete('session');
     await db.insert('session', {
       'id': 1,
       'userId': user['id'],
       'name': user['name'],
       'email': user['email'],
-      'token': token,
+      'token': stored ? null : token,
       'loggedInAt': DateTime.now().toIso8601String(),
     });
     ApiClient.setToken(token);
@@ -48,7 +59,31 @@ class Repository {
   // The API token for the logged-in user. Everything that needs it reads it
   // through here (including the background sync isolate), so where it's
   // stored can change in one place.
-  Future<String?> readToken() async => (await getCurrentUser())?['token'] as String?;
+  Future<String?> readToken() async {
+    try {
+      final token = await _secureStorage.read(key: _tokenKey);
+      if (token != null) return token;
+    } catch (_) {}
+    return (await getCurrentUser())?['token'] as String?;
+  }
+
+  Future<bool> _writeSecureToken(String token) async {
+    try {
+      await _secureStorage.write(key: _tokenKey, value: token);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // One-off, on startup: builds before secure storage kept the token in the
+  // session row. Move it across so those users stay logged in.
+  Future<void> migrateTokenToSecureStorage() async {
+    final token = (await getCurrentUser())?['token'] as String?;
+    if (token == null || !await _writeSecureToken(token)) return;
+    final db = await _dbHelper.database;
+    await db.update('session', {'token': null}, where: 'id = 1');
+  }
 
   Future<void> restoreTokenIntoMemory() async {
     ApiClient.setToken(await readToken());
@@ -57,6 +92,9 @@ class Repository {
   Future<void> logout() async {
     final db = await _dbHelper.database;
     await db.delete('session');
+    try {
+      await _secureStorage.delete(key: _tokenKey);
+    } catch (_) {}
     // Form assignments belong to the user who downloaded them. Their
     // unsent submissions stay, locked to that user (see LoginScreen).
     await db.delete('dc_forms');

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import 'api/api_client.dart';
+import 'db/repository.dart';
 import 'data_collection/sync/background_sync.dart';
 import 'data_collection/sync/sync_coordinator.dart';
 import 'screens/login_screen.dart';
@@ -21,6 +22,7 @@ void main() async {
     databaseFactory = databaseFactoryFfi;
   }
   await ApiClient.loadBaseUrl();
+  await Repository().migrateTokenToSecureStorage();
   runApp(const BeneficiaryApp());
 
   // Data collection sync: periodic/after-finalize work on Android, plus
