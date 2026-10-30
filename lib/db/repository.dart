@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
@@ -20,6 +21,7 @@ const _uuid = Uuid();
 // phone or a device backup. The session row keeps only who is logged in.
 const _secureStorage = FlutterSecureStorage();
 const _tokenKey = 'api_token';
+const _lastSyncKey = 'last_sync_at';
 
 class Repository {
   final _dbHelper = DatabaseHelper.instance;
@@ -206,6 +208,42 @@ class Repository {
     return db.query('profiles', where: 'phoneNumber = ?', whereArgs: [phone], orderBy: 'capturedAt DESC');
   }
 
+  // ── Home dashboard ──
+
+  // What the home screen shows about the app's state. Data collection
+  // counts are the logged-in user's only.
+  Future<HomeSummary> homeSummary() async {
+    final db = await _dbHelper.database;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day).toIso8601String();
+    int count(List<Map<String, Object?>> rows) => Sqflite.firstIntValue(rows) ?? 0;
+    const owner = 'ownerUserId = (SELECT userId FROM session WHERE id = 1)';
+
+    final recent = await db.rawQuery('''
+      SELECT a.clientUuid, a.activityName, a.activityDate, a.synced,
+             (SELECT COUNT(*) FROM attendances t WHERE t.activityUuid = a.clientUuid) AS attendees
+      FROM activities a ORDER BY a.activityDate DESC, a.rowid DESC LIMIT 3
+    ''');
+
+    // Latest of: the last full "Sync now", or the last clean data
+    // collection sync (which also runs automatically and in the background).
+    final lastFull = DateTime.tryParse((await SharedPreferences.getInstance()).getString(_lastSyncKey) ?? '');
+    final lastRun = await db.rawQuery('SELECT finishedAt FROM dc_sync_runs WHERE error IS NULL ORDER BY id DESC LIMIT 1');
+    final lastDc = lastRun.isEmpty ? null : DateTime.tryParse(lastRun.first['finishedAt'] as String? ?? '');
+    final lastSync = [lastFull, lastDc].whereType<DateTime>().fold<DateTime?>(null, (a, b) => a == null || b.isAfter(a) ? b : a);
+
+    return HomeSummary(
+      attendancesToday: count(await db.rawQuery('SELECT COUNT(*) FROM attendances WHERE capturedAt >= ?', [today])),
+      profilesToday: count(await db.rawQuery('SELECT COUNT(*) FROM profiles WHERE capturedAt >= ?', [today])),
+      formsToday: count(await db.rawQuery("SELECT COUNT(*) FROM dc_submissions WHERE $owner AND status != 'draft' AND finalizedAt >= ?", [today])),
+      drafts: count(await db.rawQuery("SELECT COUNT(*) FROM dc_submissions WHERE $owner AND status = 'draft'")),
+      failed: count(await db.rawQuery("SELECT COUNT(*) FROM dc_submissions WHERE $owner AND status = 'failed'")),
+      pending: await pendingSyncCount(),
+      lastSync: lastSync,
+      recentRegisters: recent,
+    );
+  }
+
   Future<int> pendingSyncCount() async {
     final db = await _dbHelper.database;
     final result = await db.rawQuery(
@@ -222,6 +260,7 @@ class Repository {
   Future<void> syncPending() async {
     await _syncAttendances();
     await _syncProfiles();
+    await (await SharedPreferences.getInstance()).setString(_lastSyncKey, DateTime.now().toIso8601String());
 
     final report = await SyncCoordinator.instance.sync(force: true);
     if (report.authExpired) throw AuthExpiredException();
@@ -302,4 +341,26 @@ class Repository {
     }
     await batch.commit(noResult: true);
   }
+}
+
+class HomeSummary {
+  const HomeSummary({
+    required this.attendancesToday,
+    required this.profilesToday,
+    required this.formsToday,
+    required this.drafts,
+    required this.failed,
+    required this.pending,
+    required this.lastSync,
+    required this.recentRegisters,
+  });
+
+  final int attendancesToday;
+  final int profilesToday;
+  final int formsToday; // data collection submissions finalized today
+  final int drafts;
+  final int failed; // rejected by the CRM, need correction
+  final int pending; // everything waiting to sync
+  final DateTime? lastSync;
+  final List<Map<String, Object?>> recentRegisters; // clientUuid, activityName, activityDate, synced, attendees
 }
