@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../db/repository.dart';
 import 'capture_screen.dart';
+import 'forms_screen.dart';
 import 'login_screen.dart';
 import 'profile_screen.dart';
 
@@ -67,6 +68,11 @@ class _ActivityScreenState extends State<ActivityScreen> {
     _loadState(); // refresh pending count after returning
   }
 
+  Future<void> _openDataCollection() async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FormsScreen()));
+    _loadState(); // refresh pending count after returning
+  }
+
   Future<void> _syncNow() async {
     setState(() => _syncing = true);
     try {
@@ -121,6 +127,14 @@ class _ActivityScreenState extends State<ActivityScreen> {
             const Text('Beneficiary Profiling', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             FilledButton.tonal(onPressed: _openProfiling, child: const Text('New Beneficiary Profile')),
+            const SizedBox(height: 24),
+            const Text('Data Collection', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            FilledButton.tonalIcon(
+              onPressed: _openDataCollection,
+              icon: const Icon(Icons.assignment_outlined),
+              label: const Text('Fill Forms'),
+            ),
             const SizedBox(height: 24),
             Text('Pending sync: $_pendingCount'),
             const SizedBox(height: 8),

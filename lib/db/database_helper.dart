@@ -6,7 +6,8 @@ import 'package:sqflite/sqflite.dart';
 
 // Same three tables as the native Kotlin/Room version: session (one row,
 // who's logged in), activities (the register header), attendances (each
-// beneficiary row) — plus profiles (the Beneficiary Profiling Tool form).
+// beneficiary row) — plus profiles (the Beneficiary Profiling Tool form)
+// and the Kobo-style data collection tables (forms + submissions).
 // Everything written here works fully offline — sync is a separate,
 // explicit step against the Laravel API.
 class DatabaseHelper {
@@ -27,9 +28,10 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 2,
+      version: 3,
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) await _createProfilesTable(db);
+        if (oldVersion < 3) await _createDataCollectionTables(db);
       },
       onCreate: (db, version) async {
         await db.execute('''
@@ -71,6 +73,7 @@ class DatabaseHelper {
         ''');
 
         await _createProfilesTable(db);
+        await _createDataCollectionTables(db);
       },
     );
   }
@@ -88,6 +91,39 @@ class DatabaseHelper {
         signaturePath TEXT,
         capturedAt TEXT,
         synced INTEGER DEFAULT 0
+      )
+    ''');
+  }
+
+  // forms: the user's CRM form assignments as last downloaded, schema kept as
+  // the raw JSON the server sent. submissions: each filled-in form, answers
+  // as JSON keyed by question id. status: draft (still editing), ready
+  // (finalized, waiting to sync), synced, or failed (server rejected it —
+  // errorMessage says why, and it can be edited and finalized again).
+  Future<void> _createDataCollectionTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE forms (
+        assignmentId INTEGER PRIMARY KEY,
+        formName TEXT,
+        formDescription TEXT,
+        projectName TEXT,
+        versionLabel TEXT,
+        schema TEXT,
+        dueDate TEXT,
+        downloadedAt TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE submissions (
+        submissionUid TEXT PRIMARY KEY,
+        assignmentId INTEGER,
+        formName TEXT,
+        answers TEXT,
+        status TEXT,
+        errorMessage TEXT,
+        startedAt TEXT,
+        updatedAt TEXT
       )
     ''');
   }

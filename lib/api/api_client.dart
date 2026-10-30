@@ -109,6 +109,34 @@ class ApiClient {
     }
     return jsonDecode(res.body) as Map<String, dynamic>;
   }
+
+  // DataCollectionController::myForms — assignments with their form schema.
+  static Future<List<dynamic>> myForms() async {
+    final res = await http.get(
+      Uri.parse('${baseUrl}data-collection/my-forms'),
+      headers: _headers(),
+    );
+    if (res.statusCode != 200) {
+      throw Exception('Could not download forms (${res.statusCode})');
+    }
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    return body['assignments'] as List<dynamic>;
+  }
+
+  // DataCollectionController::sync — idempotent via submission_uid. Returns
+  // one {submission_uid, status: created|skipped|failed, message?} per record.
+  static Future<List<dynamic>> syncSubmissions(List<Map<String, dynamic>> submissions) async {
+    final res = await http.post(
+      Uri.parse('${baseUrl}data-collection/submissions/sync'),
+      headers: _headers(json: true),
+      body: jsonEncode({'submissions': submissions}),
+    );
+    if (res.statusCode != 200) {
+      throw Exception('Form sync failed (${res.statusCode}): ${res.body}');
+    }
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    return body['results'] as List<dynamic>;
+  }
 }
 
 // The server answered but refused the login — distinct from being offline.
