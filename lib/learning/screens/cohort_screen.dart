@@ -75,8 +75,8 @@ class _CohortScreenState extends State<CohortScreen> {
           backgroundColor: const Color(0xFFF7F6F3),
           surfaceTintColor: Colors.transparent,
           actions: [
-            if (c.canEditCourse)
-              IconButton(tooltip: 'Edit course and topics', icon: const Icon(Icons.edit_outlined), onPressed: () => _push(CourseEditorScreen(cohort: c))),
+            if (c.canEditTopics)
+              IconButton(tooltip: 'Edit topics', icon: const Icon(Icons.edit_outlined), onPressed: () => _push(CourseEditorScreen(cohort: c))),
           ],
           bottom: TabBar(tabs: [
             const Tab(text: 'Sessions'),
@@ -365,7 +365,7 @@ class _CohortScreenState extends State<CohortScreen> {
               ),
             ),
           ),
-        if (c.canEditCourse)
+        if (c.canEditTopics)
           TextButton.icon(onPressed: () => _push(CourseEditorScreen(cohort: c)), icon: const Icon(Icons.add), label: const Text('Add or edit topics')),
       ],
     );

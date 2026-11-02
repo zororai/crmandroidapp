@@ -2,6 +2,7 @@ import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
 import '../db/repository.dart';
+import 'course_catalogue.dart';
 import 'db/learning_store.dart';
 import 'models/learning_models.dart';
 
@@ -43,10 +44,11 @@ class LearningSetup {
     return (await LearningStore.open(), user?['userId'] as int? ?? 0, user?['name'] as String? ?? '');
   }
 
-  // A new course with its topics, and the teacher's class on it.
-  Future<String> createCourseAndClass({
-    required String title,
-    String? description,
+  // A class on a course from the CRM's list, with the topics this teacher
+  // will teach. The course itself isn't changed; the topics belong to this
+  // class only.
+  Future<String> createClass({
+    required CatalogueCourse course,
     required List<TopicDraft> topics,
     required String className,
     String? venue,
@@ -54,9 +56,8 @@ class LearningSetup {
     String? endDate,
   }) async {
     final (store, userId, userName) = await _ctx();
-    final courseUuid = _uuid.v4();
     final cohortUuid = _uuid.v4();
-    final topicJson = [for (var i = 0; i < topics.length; i++) topics[i].toJson(i + 1)];
+    final topicJson = [for (var i = 0; i < topics.length; i++) {...topics[i].toJson(i + 1), 'class_topic': true}];
 
     await store.saveCohort({
       'client_uuid': cohortUuid,
@@ -68,8 +69,9 @@ class LearningSetup {
       'end_date': endDate,
       'my_role': 'lead',
       'checksum': '',
-      'course': {'client_uuid': courseUuid, 'title': title, 'description': description, 'can_edit': true, 'topics': topicJson},
+      'course': {'client_uuid': course.clientUuid, 'code': course.code, 'title': course.title, 'description': course.description, 'topics': topicJson},
       'roster': <dynamic>[],
+      'registered': <dynamic>[],
       'sessions': <dynamic>[],
       'records': <dynamic>[],
       'topic_progress': <dynamic>[],
@@ -77,32 +79,33 @@ class LearningSetup {
     }, userId);
 
     await store.saveSetupItem(
-      SetupItem(clientUuid: courseUuid, kind: 'course', cohortUuid: cohortUuid,
-          json: {'client_uuid': courseUuid, 'title': title, 'description': description, 'topics': topicJson}),
-      ownerUserId: userId, ownerName: userName,
-    );
-    await store.saveSetupItem(
       SetupItem(clientUuid: cohortUuid, kind: 'cohort', cohortUuid: cohortUuid, json: {
-        'client_uuid': cohortUuid, 'course_client_uuid': courseUuid, 'name': className,
+        'client_uuid': cohortUuid, 'course_client_uuid': course.clientUuid, 'name': className,
         'venue': venue, 'start_date': startDate, 'end_date': endDate,
+        'topics': [for (final t in topicJson) {...t}..remove('class_topic')],
       }),
       ownerUserId: userId, ownerName: userName,
     );
     return cohortUuid;
   }
 
-  // Rename the course or add/rename topics. The whole topic list is queued
-  // again; the CRM upserts by client_uuid.
-  Future<void> updateCourse(LearningCohort cohort, {required String title, String? description, required List<TopicDraft> topics}) async {
+  // Add or rename the class's own topics. The class item is queued again
+  // with the full list; the CRM upserts topics by client_uuid.
+  Future<void> updateClassTopics(LearningCohort cohort, List<TopicDraft> topics) async {
     final (store, userId, userName) = await _ctx();
-    final topicJson = [for (var i = 0; i < topics.length; i++) topics[i].toJson(i + 1)];
+    // Topics shared by the course stay first, untouched.
+    final shared = cohort.topics.where((t) => !t.isClassTopic && !cohort.isLocal).map((t) => t.json).toList();
+    final own = [for (var i = 0; i < topics.length; i++) {...topics[i].toJson(shared.length + i + 1), 'class_topic': true}];
 
     final json = Map<String, dynamic>.of(cohort.json);
-    json['course'] = {...cohort.course, 'title': title, 'description': description, 'topics': topicJson};
+    json['course'] = {...cohort.course, 'topics': [...shared, ...own]};
     await store.saveCohort(json, userId);
     await store.saveSetupItem(
-      SetupItem(clientUuid: cohort.courseUuid, kind: 'course', cohortUuid: cohort.uuid,
-          json: {'client_uuid': cohort.courseUuid, 'title': title, 'description': description, 'topics': topicJson}),
+      SetupItem(clientUuid: cohort.uuid, kind: 'cohort', cohortUuid: cohort.uuid, json: {
+        'client_uuid': cohort.uuid, 'course_client_uuid': cohort.courseUuid, 'name': cohort.name,
+        'venue': cohort.venue, 'start_date': cohort.startDate, 'end_date': cohort.endDate,
+        'topics': [for (final t in own) {...t}..remove('class_topic')],
+      }),
       ownerUserId: userId, ownerName: userName,
     );
   }
@@ -113,16 +116,16 @@ class LearningSetup {
     await _enrol(cohort, enrollmentUuid, {
       'client_uuid': enrollmentUuid,
       'cohort_client_uuid': cohort.uuid,
-      'beneficiary_id': beneficiary['id'],
+      'beneficiary_id': beneficiary['beneficiary_id'] ?? beneficiary['id'],
       'student_ref': studentRef,
       'enrolled_at': DateFormat('yyyy-MM-dd').format(DateTime.now()),
     }, {
-      'name': beneficiary['full_name'],
+      'name': beneficiary['name'] ?? beneficiary['full_name'],
       'gender': beneficiary['gender'],
       'age': beneficiary['age'],
       'phone_number': beneficiary['phone_number'],
       'location': beneficiary['location'],
-      'beneficiary_id': beneficiary['id'],
+      'beneficiary_id': beneficiary['beneficiary_id'] ?? beneficiary['id'],
       'student_ref': studentRef,
     });
   }

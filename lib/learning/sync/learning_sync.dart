@@ -4,6 +4,7 @@ import '../../data_collection/api/data_collection_api.dart' show ApiException, A
 import '../../data_collection/config.dart';
 import '../../data_collection/sync/sync_engine.dart' show SyncReport, retryDelay;
 import '../api/learning_api.dart';
+import '../course_catalogue.dart';
 import '../db/learning_store.dart';
 import '../models/learning_models.dart';
 
@@ -100,6 +101,7 @@ class LearningSync {
 
       if (!authExpired && error == null) {
         try {
+          await _refreshCatalogue();
           await refreshCohorts(changedOnly: true);
         } on AuthExpiredException {
           authExpired = true;
@@ -134,9 +136,12 @@ class LearningSync {
     for (final item in items) {
       final mine = results.where((r) => r.kind == item.kind && r.clientUuid == item.clientUuid).firstOrNull;
       // A course is only done when its topics are too.
-      final topicProblem = item.kind == 'course'
-          ? results.where((r) => r.kind == 'topic' && !r.isStored && (item.json['topics'] as List).any((t) => (t as Map)['client_uuid'] == r.clientUuid)).firstOrNull
-          : null;
+      final topicProblem = switch (item.kind) {
+        'course' => results.where((r) => r.kind == 'topic' && !r.isStored && (item.json['topics'] as List).any((t) => (t as Map)['client_uuid'] == r.clientUuid)).firstOrNull,
+        // A class's own topics come back inside its result.
+        'cohort' => ((mine?.json['topics'] as List?) ?? const []).cast<Map<String, dynamic>>().map(LearningBatchResult.new).where((r) => !r.isStored).firstOrNull,
+        _ => null,
+      };
 
       if (mine == null || (mine.retryable && !mine.isStored)) {
         continue; // stays pending; tried again next sync
@@ -184,6 +189,16 @@ class LearningSync {
       await store.saveDownloadedCohort(c, userId);
     }
     return cohorts.length;
+  }
+
+  // The course list (profiling's skill interests) — best effort: a failure
+  // here never fails a sync.
+  Future<void> _refreshCatalogue() async {
+    try {
+      await CourseCatalogueCache.save(await api.catalogue());
+    } on AuthExpiredException {
+      rethrow;
+    } catch (_) {}
   }
 
   Future<void> _retryLater(LocalSessionRecord r, String reason, Duration? retryAfter) {

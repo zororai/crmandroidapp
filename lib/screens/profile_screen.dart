@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../api/api_client.dart';
 import '../db/repository.dart';
 import 'signature_pad.dart';
+import '../learning/course_catalogue.dart';
 
 // Youth Enterprise Graduate Model: Beneficiary Profiling Tool — one screen
 // mirroring the paper form's sections. Option keys (the first value in each
@@ -72,6 +73,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _yesNo = <String, bool?>{};
   final _vulnerabilitySelected = <String>{};
   final _skillsSelected = <String>{};
+  // The CRM's course list; each skill ticked registers the youth for that course.
+  List<(String, String)> _skillOptions = _skills;
   final _financialSelected = <String>{};
 
   bool? _consentGiven;
@@ -80,6 +83,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _loadSkillOptions();
     _phoneFocusNode.addListener(() {
       if (!_phoneFocusNode.hasFocus) _checkPhoneNumber();
     });
@@ -235,6 +239,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       );
 
+  // Cached list first (works offline), then the latest from the CRM.
+  Future<void> _loadSkillOptions() async {
+    List<(String, String)> asOptions(List<CatalogueCourse> list) => [for (final c in list) (c.code, c.title)];
+    final cached = await CourseCatalogueCache.load();
+    if (mounted) setState(() => _skillOptions = asOptions(cached));
+    final latest = await CourseCatalogueCache.refresh();
+    if (mounted) setState(() => _skillOptions = asOptions(latest));
+  }
+
   Widget _multi(String label, Set<String> selected, List<(String, String)> options) => _question(
         label,
         Wrap(
@@ -327,7 +340,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _section('Section 2: Skills & Livelihoods'),
         _field(_incomeSourceController, 'Current income source'),
         _field(_monthlyIncomeController, 'Average monthly income', keyboard: const TextInputType.numberWithOptions(decimal: true)),
-        _multi('Skill interests', _skillsSelected, _skills),
+        _multi('Skill interests (courses)', _skillsSelected, _skillOptions),
         _single('Entrepreneurship experience', 'entrepreneurship_experience', _entrepreneurship),
         const SizedBox(height: 8),
         _field(_businessIdeaController, 'Business idea / interest area'),

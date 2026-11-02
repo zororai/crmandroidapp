@@ -2,32 +2,35 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../theme/brand_colors.dart';
+import '../course_catalogue.dart';
 import '../learning_setup.dart';
 import '../models/learning_models.dart';
 import '../widgets/learning_widgets.dart';
 
-// New course: its name, the topics to teach (in order), and the class the
-// teacher runs on it. With an existing class: rename the course and add or
-// rename topics (topics already in the CRM can't be removed). Works offline.
-// Pops with the class uuid when a new course is created.
+// New course: choose the course from the CRM's list (the same list as the
+// skill interests in beneficiary profiling), then the topics you will teach
+// and your class details. With an existing class: add or rename that
+// class's topics (ones already in the CRM can't be removed). Works offline
+// once the list has been downloaded. Pops with the class uuid when created.
 class CourseEditorScreen extends StatefulWidget {
   const CourseEditorScreen({super.key, this.cohort});
 
-  final LearningCohort? cohort; // null = new course
+  final LearningCohort? cohort; // null = new class
 
   @override
   State<CourseEditorScreen> createState() => _CourseEditorScreenState();
 }
 
 class _CourseEditorScreenState extends State<CourseEditorScreen> {
-  final _title = TextEditingController();
-  final _description = TextEditingController();
   final _className = TextEditingController();
   final _venue = TextEditingController();
   String? _startDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
   String? _endDate;
   final _topics = <TopicDraft>[];
   final _topicControllers = <String, TextEditingController>{};
+  List<CatalogueCourse> _catalogue = [];
+  bool _catalogueDownloaded = true;
+  CatalogueCourse? _course;
   bool _classNameEdited = false;
   bool _saving = false;
   String? _error;
@@ -39,19 +42,39 @@ class _CourseEditorScreenState extends State<CourseEditorScreen> {
     super.initState();
     final c = widget.cohort;
     if (c != null) {
-      _title.text = c.courseTitle;
-      _description.text = c.courseDescription ?? '';
-      for (final t in c.topics) {
+      for (final t in c.topics.where((t) => t.isClassTopic || c.isLocal)) {
         _topics.add(TopicDraft(uuid: t.uuid, title: t.title, plannedSessions: t.plannedSessions, isAssessed: t.isAssessed, uploaded: !c.isLocal));
       }
+      if (_topics.isEmpty) _topics.add(TopicDraft(title: ''));
     } else {
       _topics.add(TopicDraft(title: ''));
+      _loadCatalogue();
+    }
+  }
+
+  Future<void> _loadCatalogue() async {
+    final cached = await CourseCatalogueCache.load();
+    final downloaded = await CourseCatalogueCache.isDownloaded();
+    if (mounted) {
+      setState(() {
+        _catalogue = cached;
+        _catalogueDownloaded = downloaded;
+      });
+    }
+    final latest = await CourseCatalogueCache.refresh();
+    final nowDownloaded = await CourseCatalogueCache.isDownloaded();
+    if (mounted) {
+      setState(() {
+        _catalogue = latest;
+        _catalogueDownloaded = nowDownloaded;
+        if (_course != null) _course = latest.where((c) => c.code == _course!.code).firstOrNull;
+      });
     }
   }
 
   @override
   void dispose() {
-    for (final c in [_title, _description, _className, _venue, ..._topicControllers.values]) {
+    for (final c in [_className, _venue, ..._topicControllers.values]) {
       c.dispose();
     }
     super.dispose();
@@ -79,13 +102,14 @@ class _CourseEditorScreenState extends State<CourseEditorScreen> {
       t.title = _controllerFor(t).text.trim();
     }
     final topics = _topics.where((t) => t.title.isNotEmpty).toList();
-    final title = _title.text.trim();
 
     String? error;
-    if (title.isEmpty) {
-      error = 'Enter the course name.';
+    if (_isNew && _course == null) {
+      error = 'Choose the course.';
+    } else if (_isNew && _course!.clientUuid == null) {
+      error = 'Connect to the internet once to download the course list, then try again.';
     } else if (topics.isEmpty) {
-      error = 'Add at least one topic.';
+      error = 'Add at least one topic you will teach.';
     } else if (_endDate != null && _startDate != null && _endDate!.compareTo(_startDate!) < 0) {
       error = 'The end date is before the start date.';
     }
@@ -96,31 +120,30 @@ class _CourseEditorScreenState extends State<CourseEditorScreen> {
 
     setState(() => _saving = true);
     final setup = LearningSetup();
-    final description = _description.text.trim().isEmpty ? null : _description.text.trim();
     if (_isNew) {
-      final className = _className.text.trim().isEmpty ? title : _className.text.trim();
-      final uuid = await setup.createCourseAndClass(
-        title: title,
-        description: description,
+      final uuid = await setup.createClass(
+        course: _course!,
         topics: topics,
-        className: className,
+        className: _className.text.trim().isEmpty ? _course!.title : _className.text.trim(),
         venue: _venue.text.trim().isEmpty ? null : _venue.text.trim(),
         startDate: _startDate,
         endDate: _endDate,
       );
       if (mounted) Navigator.of(context).pop(uuid);
     } else {
-      await setup.updateCourse(widget.cohort!, title: title, description: description, topics: topics);
+      await setup.updateClassTopics(widget.cohort!, topics);
       if (mounted) Navigator.of(context).pop();
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final shared = widget.cohort?.topics.where((t) => !t.isClassTopic && !(widget.cohort?.isLocal ?? false)).toList() ?? const <LearningTopic>[];
+
     return Scaffold(
       backgroundColor: const Color(0xFFF7F6F3),
       appBar: AppBar(
-        title: Text(_isNew ? 'New course' : 'Edit course'),
+        title: Text(_isNew ? 'New course' : 'Topics'),
         backgroundColor: const Color(0xFFF7F6F3),
         surfaceTintColor: Colors.transparent,
       ),
@@ -134,24 +157,38 @@ class _CourseEditorScreenState extends State<CourseEditorScreen> {
               decoration: BoxDecoration(color: statusCritical.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(12)),
               child: Row(children: [const Icon(Icons.error_outline, color: statusCritical), const SizedBox(width: 10), Expanded(child: Text(_error!))]),
             ),
-          _section('Course', [
-            TextField(
-              controller: _title,
-              textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(labelText: 'Course name', hintText: 'e.g. Baking Basics', border: OutlineInputBorder()),
-              onChanged: (v) {
-                if (_isNew && !_classNameEdited) _className.text = v;
-              },
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _description,
-              maxLines: 2,
-              decoration: const InputDecoration(labelText: 'Description (optional)', border: OutlineInputBorder()),
-            ),
-          ]),
-          _section('Topics you will teach', [
-            const Text('In teaching order. You will assess students on each topic as you teach it.', style: TextStyle(fontSize: 13, color: inkSecondary)),
+          if (_isNew)
+            _section('Course', [
+              DropdownButtonFormField<String>(
+                initialValue: _course?.code,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Course', border: OutlineInputBorder()),
+                hint: const Text('Choose from the course list'),
+                items: [for (final c in _catalogue) DropdownMenuItem(value: c.code, child: Text(c.title))],
+                onChanged: (code) => setState(() {
+                  _course = _catalogue.firstWhere((c) => c.code == code);
+                  if (!_classNameEdited) _className.text = _course!.title;
+                  _error = null;
+                }),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _catalogueDownloaded
+                    ? 'The same list as the skill interests in beneficiary profiling. Youth who chose this course appear when you add students.'
+                    : 'Showing the built-in list. Connect to the internet once to download the CRM\'s course list.',
+                style: const TextStyle(fontSize: 12, color: inkSecondary),
+              ),
+              if (_course?.description != null) ...[
+                const SizedBox(height: 8),
+                Text(_course!.description!, style: const TextStyle(color: inkSecondary)),
+              ],
+            ]),
+          _section(_isNew ? 'Topics you will teach' : 'Your topics', [
+            const Text('In teaching order. You assess each student on a topic when you teach it.', style: TextStyle(fontSize: 13, color: inkSecondary)),
+            if (shared.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text('Set by the course: ${shared.map((t) => t.title).join(', ')}', style: const TextStyle(fontSize: 12, color: inkMuted)),
+            ],
             const SizedBox(height: 8),
             ReorderableListView(
               shrinkWrap: true,
@@ -222,7 +259,7 @@ class _CourseEditorScreenState extends State<CourseEditorScreen> {
             _section('Your class', [
               TextField(
                 controller: _className,
-                decoration: const InputDecoration(labelText: 'Class name', helperText: 'Same as the course unless you run several classes', border: OutlineInputBorder()),
+                decoration: const InputDecoration(labelText: 'Class name', helperText: 'e.g. "Tailoring - Mbare, Nov 2026"', border: OutlineInputBorder()),
                 onChanged: (_) => _classNameEdited = true,
               ),
               const SizedBox(height: 12),
@@ -242,7 +279,7 @@ class _CourseEditorScreenState extends State<CourseEditorScreen> {
           child: FilledButton.icon(
             onPressed: _saving ? null : _save,
             icon: Icon(_isNew ? Icons.arrow_forward : Icons.check),
-            label: Text(_isNew ? 'Create course and add students' : 'Save changes'),
+            label: Text(_isNew ? 'Create class and add students' : 'Save topics'),
             style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
           ),
         ),

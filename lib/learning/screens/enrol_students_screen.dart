@@ -10,9 +10,11 @@ import '../learning_setup.dart';
 import '../models/learning_models.dart';
 import '../widgets/learning_widgets.dart';
 
-// Add students to a class: find someone already registered in the CRM
-// (search needs a connection; name, phone and district are shown because
-// names repeat), or add a new student, which works offline and becomes a
+// Add students to a class. First the youth who chose this course in
+// beneficiary profiling (its waiting list, downloaded with the class, so it
+// works offline) — one tap each. Then search anyone else registered in the
+// CRM (needs a connection; name, phone and district are shown because names
+// repeat), or add a new student, which works offline and becomes a
 // beneficiary profile in the CRM when it uploads.
 class EnrolStudentsScreen extends StatefulWidget {
   const EnrolStudentsScreen({super.key, required this.cohortUuid});
@@ -92,13 +94,22 @@ class _EnrolStudentsScreenState extends State<EnrolStudentsScreen> {
   }
 
   bool _alreadyIn(Map<String, dynamic> b) =>
-      _cohort?.roster.any((s) => s.beneficiaryId != null && s.beneficiaryId == b['id']) ?? false;
+      _cohort?.roster.any((s) => s.beneficiaryId != null && s.beneficiaryId == (b['beneficiary_id'] ?? b['id'])) ?? false;
+
+  Future<void> _addAllRegistered(List<Map<String, dynamic>> registered) async {
+    for (final r in registered) {
+      await _setup.enrolExisting(_cohort!, r);
+      _added++;
+      await _reload();
+    }
+    _show('${registered.length} student${registered.length == 1 ? '' : 's'} added to the class.');
+  }
 
   Future<void> _addExisting(Map<String, dynamic> b) async {
     await _setup.enrolExisting(_cohort!, b);
     _added++;
     await _reload();
-    _show('${b['full_name']} added to the class.');
+    _show('${b['name'] ?? b['full_name']} added to the class.');
   }
 
   Future<void> _addNew() async {
@@ -136,6 +147,41 @@ class _EnrolStudentsScreenState extends State<EnrolStudentsScreen> {
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
+                if (c.registered.isNotEmpty) ...[
+                  Row(children: [
+                    Expanded(
+                      child: Text('Registered for ${c.courseTitle} (${c.registered.length})',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: brandInk)),
+                    ),
+                    if (c.registered.length > 1)
+                      TextButton(onPressed: () => _addAllRegistered(c.registered), child: const Text('Add all')),
+                  ]),
+                  const Text('Chose this course as a skill interest in beneficiary profiling.', style: TextStyle(fontSize: 12, color: inkSecondary)),
+                  for (final r in c.registered)
+                    Card(
+                      elevation: 0,
+                      color: Colors.white,
+                      margin: const EdgeInsets.only(top: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: hairline)),
+                      child: ListTile(
+                        leading: const Icon(Icons.how_to_reg_outlined, color: brandPurple),
+                        title: Text('${r['name']}', style: const TextStyle(fontWeight: FontWeight.w600, color: brandInk)),
+                        subtitle: Text(
+                          [
+                            if (r['phone_number'] != null) '${r['phone_number']}',
+                            if (r['location'] != null) '${r['location']}',
+                            if (r['gender'] != null) '${r['gender']}',
+                            if (r['age'] != null) '${r['age']} yrs',
+                          ].join(' · '),
+                          style: const TextStyle(color: inkSecondary),
+                        ),
+                        trailing: FilledButton.tonal(onPressed: () => _addExisting(r), child: const Text('Add')),
+                      ),
+                    ),
+                  const SizedBox(height: 20),
+                  const Text('Someone else', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: brandInk)),
+                  const SizedBox(height: 8),
+                ],
                 TextField(
                   controller: _search,
                   onChanged: _onQuery,

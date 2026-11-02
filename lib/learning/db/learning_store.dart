@@ -57,8 +57,8 @@ class LearningStore {
       if (item.kind == 'enrollment' && !roster.any((r) => (r as Map)['client_uuid'] == item.clientUuid)) {
         roster.add(item.json['_roster_entry']);
       }
-      if (item.kind == 'course') {
-        for (final t in (item.json['topics'] as List).cast<Map<String, dynamic>>()) {
+      if (item.kind == 'course' || item.kind == 'cohort') {
+        for (final t in ((item.json['topics'] as List?) ?? const []).cast<Map<String, dynamic>>()) {
           if (!topics.any((x) => (x as Map)['client_uuid'] == t['client_uuid'])) topics.add(t);
         }
       }

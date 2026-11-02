@@ -27,6 +27,9 @@ abstract class LearningApi {
 
   // Existing beneficiaries by name or phone (online only).
   Future<List<Map<String, dynamic>>> searchBeneficiaries(String query);
+
+  // The course list (also profiling's skill interests).
+  Future<List<Map<String, dynamic>>> catalogue();
 }
 
 LearningApi createLearningApi({required String? baseUrl, required String? token}) =>
@@ -111,6 +114,12 @@ class HttpLearningApi implements LearningApi {
     final body = await _send(() => _client.get(_uri('beneficiaries', {'q': query}), headers: _headers));
     return ((body['results'] as List?) ?? const []).cast<Map<String, dynamic>>();
   }
+
+  @override
+  Future<List<Map<String, dynamic>>> catalogue() async {
+    final body = await _send(() => _client.get(_uri('catalogue'), headers: _headers));
+    return ((body['courses'] as List?) ?? const []).cast<Map<String, dynamic>>();
+  }
 }
 
 const demoCohortAsset = 'assets/learning/demo_cohort.json';
@@ -134,6 +143,19 @@ class MockLearningApi implements LearningApi {
     {'id': 9102, 'client_uuid': 'aaaaaaaa-0000-4000-8000-000000009102', 'full_name': 'Kudakwashe Zhou', 'gender': 'M', 'age': 20, 'location': 'Mbare', 'phone_number': '0772000102'},
     {'id': 9103, 'client_uuid': 'aaaaaaaa-0000-4000-8000-000000009103', 'full_name': 'Tariro Mutasa', 'gender': 'F', 'age': 17, 'location': 'Chitungwiza', 'phone_number': '0772000103'},
   ];
+
+  static const _listed = [
+    ('tailoring', 'Tailoring'), ('ict_digital', 'ICT/Digital'), ('agriculture', 'Agriculture'), ('handicrafts', 'Handicrafts'),
+    ('hair_dressing', 'Hair dressing'), ('cosmetology', 'Cosmetology'), ('mechanics', 'Mechanics'), ('building', 'Building'),
+    ('carpentry', 'Carpentry'), ('food_processing', 'Food Processing'), ('nurse_aide', 'Nurse aide'), ('teaching', 'Teaching'),
+    ('hotel_catering', 'Hotel and Catering'), ('baking', 'Baking'), ('welding', 'Welding'), ('graphic_design', 'Graphic Designing'),
+  ];
+
+  @override
+  Future<List<Map<String, dynamic>>> catalogue() async => [
+        for (final (i, (code, title)) in _listed.indexed)
+          {'id': 100 + i, 'client_uuid': 'cccccccc-0000-4000-8000-${(100 + i).toString().padLeft(12, '0')}', 'code': code, 'title': title, 'description': null},
+      ];
 
   Future<Map<String, dynamic>> _demo() async => jsonDecode(await rootBundle.loadString(demoCohortAsset)) as Map<String, dynamic>;
 
@@ -184,13 +206,19 @@ class MockLearningApi implements LearningApi {
         k['checksum'] = 'mock-${_nextId++}';
       }
     }
+    final listed = await catalogue();
     for (final k in payload['cohorts'] ?? const <Map<String, dynamic>>[]) {
-      final course = _courses[k['course_client_uuid']] ?? {'client_uuid': k['course_client_uuid'], 'title': '', 'topics': []};
+      final course = _courses[k['course_client_uuid']] ??
+          listed.where((c) => c['client_uuid'] == k['course_client_uuid']).firstOrNull ??
+          {'client_uuid': k['course_client_uuid'], 'title': ''};
+      final topics = [for (final t in ((k['topics'] as List?) ?? const []).cast<Map<String, dynamic>>()) {...t, 'id': _nextId++, 'class_topic': true}];
+      final existing = _created[k['client_uuid'] as String];
       _created[k['client_uuid'] as String] = {
-        'id': _nextId++, 'client_uuid': k['client_uuid'], 'name': k['name'], 'venue': k['venue'], 'status': 'running',
+        'id': existing?['id'] ?? _nextId++, 'client_uuid': k['client_uuid'], 'name': k['name'], 'venue': k['venue'], 'status': 'running',
         'start_date': k['start_date'], 'end_date': k['end_date'], 'my_role': 'lead', 'checksum': 'mock-${_nextId++}',
-        'course': {'client_uuid': course['client_uuid'], 'title': course['title'], 'description': course['description'], 'can_edit': true, 'min_attendance_pct': 75, 'topics': course['topics']},
-        'roster': <dynamic>[], 'sessions': <dynamic>[], 'records': <dynamic>[], 'topic_progress': <dynamic>[], 'progress': <String, dynamic>{},
+        'course': {'client_uuid': course['client_uuid'], 'code': course['code'], 'title': course['title'], 'description': course['description'], 'can_edit': false, 'min_attendance_pct': 75, 'topics': topics},
+        'roster': existing?['roster'] ?? <dynamic>[], 'registered': _people.take(2).toList(),
+        'sessions': <dynamic>[], 'records': <dynamic>[], 'topic_progress': <dynamic>[], 'progress': <String, dynamic>{},
       };
       results.add({'kind': 'cohort', 'client_uuid': k['client_uuid'], 'status': 'accepted', 'id': _created[k['client_uuid']]!['id']});
     }
@@ -204,6 +232,7 @@ class MockLearningApi implements LearningApi {
           ? _students[e['student_client_uuid']]
           : _people.where((p) => p['id'] == e['beneficiary_id']).firstOrNull;
       if (k != null && person != null) {
+        (k['registered'] as List?)?.removeWhere((r) => (r as Map)['id'] == e['beneficiary_id'] || r['beneficiary_id'] == e['beneficiary_id']);
         (k['roster'] as List).add({
           'enrollment_id': _nextId++, 'client_uuid': e['client_uuid'], 'name': person['full_name'], 'gender': person['gender'],
           'age': person['age'], 'phone_number': person['phone_number'], 'location': person['location'], 'student_ref': e['student_ref'],

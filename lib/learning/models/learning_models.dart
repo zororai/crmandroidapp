@@ -15,6 +15,8 @@ class LearningTopic {
   String? get description => json['description'] as String?;
   int get plannedSessions => json['planned_sessions'] as int? ?? 1;
   bool get isAssessed => json['is_assessed'] != false;
+  // The teacher's own topic for this class (others are shared by the course).
+  bool get isClassTopic => json['class_topic'] == true;
 }
 
 class LearningStudent {
@@ -72,7 +74,10 @@ class LearningCohort {
   String get courseUuid => course['client_uuid'] as String? ?? '';
   String get courseTitle => course['title'] as String? ?? '';
   String? get courseDescription => course['description'] as String?;
-  bool get canEditCourse => course['can_edit'] == true;
+  String? get courseCode => course['code'] as String?;
+  // A teacher plans their own class: the lead (or whoever set it up here)
+  // can add and rename the class's topics.
+  bool get canEditTopics => isLocal || myRole == 'lead' || course['can_edit'] == true;
   bool get canEnrol => myRole == 'lead' || isLocal;
   double? get minAttendancePct => (course['min_attendance_pct'] as num?)?.toDouble();
   Map<String, dynamic> get progress => (json['progress'] as Map?)?.cast<String, dynamic>() ?? const {};
@@ -87,6 +92,14 @@ class LearningCohort {
   // Recent session records already on the server (with their attendance).
   List<Map<String, dynamic>> get serverRecords => ((json['records'] as List?) ?? const []).cast<Map<String, dynamic>>();
   List<Map<String, dynamic>> get topicProgress => ((json['topic_progress'] as List?) ?? const []).cast<Map<String, dynamic>>();
+  // Youth registered for this course in profiling, not yet in this class.
+  List<Map<String, dynamic>> get registered {
+    final enrolled = roster.map((s) => s.beneficiaryId).whereType<int>().toSet();
+    return ((json['registered'] as List?) ?? const [])
+        .cast<Map<String, dynamic>>()
+        .where((r) => !enrolled.contains(r['beneficiary_id'] ?? r['id']))
+        .toList();
+  }
 
   LearningTopic? topic(String? uuid) => uuid == null ? null : topics.where((t) => t.uuid == uuid).firstOrNull;
   LearningStudent? student(String uuid) => roster.where((s) => s.uuid == uuid).firstOrNull;

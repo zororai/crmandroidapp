@@ -129,11 +129,11 @@ class _AppDrawerState extends State<AppDrawer> {
           selectedIcon: Icon(Icons.badge),
           label: Text('Beneficiary profile'),
         ),
-        _sectionLabel('Courses'),
+        _sectionLabel('Teaching'),
         const NavigationDrawerDestination(
           icon: Icon(Icons.school_outlined),
           selectedIcon: Icon(Icons.school),
-          label: Text('My courses'),
+          label: Text('Courses'),
         ),
         const NavigationDrawerDestination(
           icon: Icon(Icons.insights_outlined),

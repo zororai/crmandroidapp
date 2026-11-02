@@ -14,7 +14,7 @@
     "title": "Tailoring Basics",
     "description": "Basic tailoring skills for self-employment.",
     "can_edit": false,
-    "code": "TB-DEMO",
+    "code": "tailoring",
     "min_attendance_pct": 75,
     "topics": [
       {
@@ -599,5 +599,25 @@
         "value": 1
       }
     ]
-  }
+  },
+  "registered": [
+    {
+      "beneficiary_id": 9201,
+      "name": "Tsitsi Mhlanga",
+      "gender": "F",
+      "age": 18,
+      "location": "Mbare",
+      "phone_number": "0772000201",
+      "registered_at": "2026-10-25"
+    },
+    {
+      "beneficiary_id": 9202,
+      "name": "Kudakwashe Zhou",
+      "gender": "M",
+      "age": 20,
+      "location": "Mbare",
+      "phone_number": "0772000202",
+      "registered_at": "2026-10-28"
+    }
+  ]
 }

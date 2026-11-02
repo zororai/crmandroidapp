@@ -281,7 +281,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
   }
 
   Widget _quickActions() => _grid([
-        _ActionCard(icon: Icons.school, label: 'My courses', onTap: () => _push(const CohortsScreen())),
+        _ActionCard(icon: Icons.school, label: 'Courses', onTap: () => _push(const CohortsScreen())),
         _ActionCard(icon: Icons.how_to_reg, label: 'New attendance register', onTap: _newRegister),
         _ActionCard(icon: Icons.badge, label: 'New beneficiary profile', onTap: () => _push(const ProfileScreen())),
         _ActionCard(icon: Icons.assignment, label: 'Fill a form', onTap: () => _push(const FormsListScreen())),
