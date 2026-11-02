@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../api/api_client.dart';
 import '../data_collection/db/data_collection_store.dart';
 import '../data_collection/media/media_files.dart';
+import '../learning/db/learning_store.dart';
 import '../db/repository.dart';
 import '../theme/brand_colors.dart';
 import 'activity_screen.dart';
@@ -153,17 +154,34 @@ class _LoginScreenState extends State<LoginScreen> {
   // discard them. Returns false to cancel the login.
   Future<bool> _resolveQueuedSubmissions(Map<String, dynamic> user) async {
     final store = await DataCollectionStore.open();
-    for (final other in await store.queuedForOtherOwners(user['id'] as int)) {
+    final learning = LearningStore(store.db);
+    final userId = user['id'] as int;
+
+    // Unsent forms and unsent course sessions, per other user.
+    final owners = <int, ({String name, int forms, int sessions})>{};
+    for (final o in await store.queuedForOtherOwners(userId)) {
+      owners[o.ownerUserId] = (name: o.ownerName, forms: o.count, sessions: 0);
+    }
+    for (final o in await learning.queuedForOtherOwners(userId)) {
+      final prev = owners[o.ownerUserId];
+      owners[o.ownerUserId] = (name: prev?.name ?? o.ownerName, forms: prev?.forms ?? 0, sessions: o.count);
+    }
+
+    for (final MapEntry(key: ownerId, value: other) in owners.entries) {
       if (!mounted) return false;
-      final owner = other.ownerName.isEmpty ? 'another user' : other.ownerName;
+      final owner = other.name.isEmpty ? 'another user' : other.name;
+      final what = [
+        if (other.forms > 0) '${other.forms} form submission(s)',
+        if (other.sessions > 0) '${other.sessions} course session register(s)',
+      ].join(' and ');
       final choice = await showDialog<String>(
         context: context,
         barrierDismissible: false,
         builder: (context) => AlertDialog(
-          title: Text('Unsent forms from $owner'),
+          title: Text('Unsent work from $owner'),
           content: Text(
-            'This device has ${other.count} form submission(s) collected by $owner that have not been sent. '
-            'They can only be sent from $owner\'s account.\n\n'
+            'This device has $what recorded by $owner that have not been sent. '
+            "They can only be sent from $owner's account.\n\n"
             'Keep them for $owner to send later, or discard them permanently?',
           ),
           actions: [
@@ -178,8 +196,8 @@ class _LoginScreenState extends State<LoginScreen> {
         final confirmed = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: Text('Discard ${other.count} submission(s)?'),
-            content: Text('$owner\'s unsent forms and photos will be deleted from this device. This can\'t be undone.'),
+            title: Text('Discard $what?'),
+            content: Text("$owner's unsent work (and form photos) will be deleted from this device. This can't be undone."),
             actions: [
               TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Back')),
               FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Discard')),
@@ -187,13 +205,15 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         );
         if (confirmed != true) return false;
-        for (final path in await store.discardQueue(other.ownerUserId)) {
+        for (final path in await store.discardQueue(ownerId)) {
           await const MediaFiles().delete(path);
         }
+        await learning.discardQueue(ownerId);
       }
     }
     return true;
   }
+
 
   void _goToActivityScreen() {
     Navigator.of(context).pushReplacement(

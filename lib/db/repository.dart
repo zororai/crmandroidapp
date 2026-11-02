@@ -100,6 +100,7 @@ class Repository {
     // Form assignments belong to the user who downloaded them. Their
     // unsent submissions stay, locked to that user (see LoginScreen).
     await db.delete('dc_forms');
+    await db.delete('lc_cohorts');
     ApiClient.setToken(null);
   }
 
@@ -249,6 +250,8 @@ class Repository {
     final result = await db.rawQuery(
       'SELECT (SELECT COUNT(*) FROM attendances WHERE synced = 0) + (SELECT COUNT(*) FROM profiles WHERE synced = 0)'
       " + (SELECT COUNT(*) FROM dc_submissions WHERE status IN ('finalized', 'syncing')"
+      ' AND ownerUserId = (SELECT userId FROM session WHERE id = 1))'
+      " + (SELECT COUNT(*) FROM lc_session_records WHERE status IN ('finalized', 'syncing')"
       ' AND ownerUserId = (SELECT userId FROM session WHERE id = 1)) as c',
     );
     return Sqflite.firstIntValue(result) ?? 0;

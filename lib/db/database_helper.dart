@@ -28,7 +28,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 4,
+      version: 5,
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) await _createProfilesTable(db);
         if (oldVersion < 4) {
@@ -42,6 +42,7 @@ class DatabaseHelper {
           }
           await createDataCollectionTables(db);
         }
+        if (oldVersion < 5) await createLearningTables(db);
       },
       onCreate: (db, version) async {
         await db.execute('''
@@ -84,6 +85,7 @@ class DatabaseHelper {
 
         await _createProfilesTable(db);
         await createDataCollectionTables(db);
+        await createLearningTables(db);
       },
     );
   }
@@ -189,4 +191,44 @@ Future<void> createDataCollectionTables(Database db) async {
       error TEXT
     )
   ''');
+}
+
+// Course delivery (facilitators): cohorts as downloaded from the CRM, and the
+// sessions recorded on this device — which are also the sync queue.
+Future<void> createLearningTables(Database db) async {
+  await db.execute('''
+    CREATE TABLE lc_cohorts (
+      cohortId INTEGER PRIMARY KEY,
+      ownerUserId INTEGER,
+      checksum TEXT,
+      json TEXT,
+      downloadedAt TEXT
+    )
+  ''');
+
+  await db.execute('''
+    CREATE TABLE lc_session_records (
+      clientUuid TEXT PRIMARY KEY,
+      cohortId INTEGER,
+      cohortSessionId INTEGER,
+      heldOn TEXT,
+      startedAt TEXT,
+      endedAt TEXT,
+      notes TEXT,
+      topics TEXT,
+      attendance TEXT,
+      topicProgress TEXT,
+      status TEXT,
+      errorReason TEXT,
+      warnings TEXT,
+      attempts INTEGER DEFAULT 0,
+      nextAttemptAt TEXT,
+      ownerUserId INTEGER,
+      ownerName TEXT,
+      createdAt TEXT,
+      updatedAt TEXT,
+      sentAt TEXT
+    )
+  ''');
+  await db.execute('CREATE INDEX lc_records_owner_status ON lc_session_records (ownerUserId, status)');
 }

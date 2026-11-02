@@ -1,0 +1,531 @@
+{
+  "id": 7001,
+  "name": "Tailoring — Mbare Demo",
+  "venue": "Mbare Community Hall",
+  "status": "running",
+  "start_date": "2026-10-06",
+  "end_date": "2026-12-15",
+  "my_role": "lead",
+  "checksum": "demo-2026-11-02",
+  "course": {
+    "id": 70,
+    "title": "Tailoring Basics",
+    "code": "TB-DEMO",
+    "min_attendance_pct": 75,
+    "topics": [
+      {
+        "id": 701,
+        "position": 1,
+        "title": "Introduction and workplace safety",
+        "description": null,
+        "planned_sessions": 1,
+        "is_assessed": false
+      },
+      {
+        "id": 702,
+        "position": 2,
+        "title": "Taking body measurements",
+        "description": null,
+        "planned_sessions": 1,
+        "is_assessed": true
+      },
+      {
+        "id": 703,
+        "position": 3,
+        "title": "Pattern drafting basics",
+        "description": null,
+        "planned_sessions": 2,
+        "is_assessed": false
+      },
+      {
+        "id": 704,
+        "position": 4,
+        "title": "Cutting fabric",
+        "description": null,
+        "planned_sessions": 1,
+        "is_assessed": true
+      },
+      {
+        "id": 705,
+        "position": 5,
+        "title": "Machine stitching",
+        "description": null,
+        "planned_sessions": 2,
+        "is_assessed": false
+      },
+      {
+        "id": 706,
+        "position": 6,
+        "title": "Finishing and pressing",
+        "description": null,
+        "planned_sessions": 1,
+        "is_assessed": false
+      }
+    ]
+  },
+  "roster": [
+    {
+      "enrollment_id": 801,
+      "beneficiary_id": 1801,
+      "name": "Rudo Banda",
+      "gender": "F",
+      "age": 19,
+      "student_ref": "TB-001",
+      "photo_url": null,
+      "status": "active",
+      "enrolled_at": "2026-10-06",
+      "attendance_pct": 100.0,
+      "topics_covered_pct": 50.0,
+      "assessed_progress_pct": 50.0,
+      "eligible_for_completion": false,
+      "at_risk": []
+    },
+    {
+      "enrollment_id": 802,
+      "beneficiary_id": 1802,
+      "name": "Tendai Moyo",
+      "gender": "M",
+      "age": 21,
+      "student_ref": "TB-002",
+      "photo_url": null,
+      "status": "active",
+      "enrolled_at": "2026-10-06",
+      "attendance_pct": 66.7,
+      "topics_covered_pct": 33.4,
+      "assessed_progress_pct": 0.0,
+      "eligible_for_completion": false,
+      "at_risk": []
+    },
+    {
+      "enrollment_id": 803,
+      "beneficiary_id": 1803,
+      "name": "Chipo Dube",
+      "gender": "F",
+      "age": 17,
+      "student_ref": "TB-003",
+      "photo_url": null,
+      "status": "active",
+      "enrolled_at": "2026-10-06",
+      "attendance_pct": 100.0,
+      "topics_covered_pct": 50.0,
+      "assessed_progress_pct": 50.0,
+      "eligible_for_completion": false,
+      "at_risk": []
+    },
+    {
+      "enrollment_id": 804,
+      "beneficiary_id": 1804,
+      "name": "Farai Ncube",
+      "gender": "M",
+      "age": 23,
+      "student_ref": "TB-004",
+      "photo_url": null,
+      "status": "active",
+      "enrolled_at": "2026-10-06",
+      "attendance_pct": 33.3,
+      "topics_covered_pct": 16.6,
+      "assessed_progress_pct": 0.0,
+      "eligible_for_completion": false,
+      "at_risk": [
+        {
+          "code": "consecutive_absences",
+          "value": 2
+        },
+        {
+          "code": "low_attendance",
+          "value": 33.3
+        }
+      ]
+    },
+    {
+      "enrollment_id": 805,
+      "beneficiary_id": 1805,
+      "name": "Nyasha Chirwa",
+      "gender": "F",
+      "age": 18,
+      "student_ref": "TB-005",
+      "photo_url": null,
+      "status": "active",
+      "enrolled_at": "2026-10-06",
+      "attendance_pct": 100.0,
+      "topics_covered_pct": 50.0,
+      "assessed_progress_pct": 50.0,
+      "eligible_for_completion": false,
+      "at_risk": []
+    },
+    {
+      "enrollment_id": 806,
+      "beneficiary_id": 1806,
+      "name": "Tatenda Phiri",
+      "gender": "M",
+      "age": 20,
+      "student_ref": "TB-006",
+      "photo_url": null,
+      "status": "active",
+      "enrolled_at": "2026-10-06",
+      "attendance_pct": 66.7,
+      "topics_covered_pct": 33.4,
+      "assessed_progress_pct": 0.0,
+      "eligible_for_completion": false,
+      "at_risk": []
+    },
+    {
+      "enrollment_id": 807,
+      "beneficiary_id": 1807,
+      "name": "Ruvimbo Sibanda",
+      "gender": "F",
+      "age": 16,
+      "student_ref": "TB-007",
+      "photo_url": null,
+      "status": "active",
+      "enrolled_at": "2026-10-06",
+      "attendance_pct": 100.0,
+      "topics_covered_pct": 50.0,
+      "assessed_progress_pct": 0.0,
+      "eligible_for_completion": false,
+      "at_risk": []
+    },
+    {
+      "enrollment_id": 808,
+      "beneficiary_id": 1808,
+      "name": "Tapiwa Gumbo",
+      "gender": "M",
+      "age": 22,
+      "student_ref": "TB-008",
+      "photo_url": null,
+      "status": "dropped",
+      "enrolled_at": "2026-10-06",
+      "attendance_pct": 0.0,
+      "topics_covered_pct": 0.0,
+      "assessed_progress_pct": 0.0,
+      "eligible_for_completion": false,
+      "at_risk": []
+    }
+  ],
+  "topic_progress": [
+    {
+      "enrollment_id": 801,
+      "topic_id": 702,
+      "status": "completed",
+      "score": 78.0,
+      "assessed_at": "2026-10-13T10:50:00+02:00"
+    },
+    {
+      "enrollment_id": 803,
+      "topic_id": 702,
+      "status": "completed",
+      "score": 85.0,
+      "assessed_at": "2026-10-13T10:50:00+02:00"
+    },
+    {
+      "enrollment_id": 805,
+      "topic_id": 702,
+      "status": "completed",
+      "score": 64.5,
+      "assessed_at": "2026-10-13T10:50:00+02:00"
+    }
+  ],
+  "sessions": [
+    {
+      "id": 901,
+      "scheduled_date": "2026-10-06",
+      "start_time": "09:00",
+      "end_time": "11:00",
+      "planned_topic_id": 701,
+      "status": "held",
+      "is_ad_hoc": false
+    },
+    {
+      "id": 902,
+      "scheduled_date": "2026-10-13",
+      "start_time": "09:00",
+      "end_time": "11:00",
+      "planned_topic_id": 702,
+      "status": "held",
+      "is_ad_hoc": false
+    },
+    {
+      "id": 903,
+      "scheduled_date": "2026-10-20",
+      "start_time": "09:00",
+      "end_time": "11:00",
+      "planned_topic_id": 703,
+      "status": "held",
+      "is_ad_hoc": false
+    },
+    {
+      "id": 904,
+      "scheduled_date": "2026-10-27",
+      "start_time": "09:00",
+      "end_time": "11:00",
+      "planned_topic_id": 703,
+      "status": "scheduled",
+      "is_ad_hoc": false
+    },
+    {
+      "id": 905,
+      "scheduled_date": "2026-11-03",
+      "start_time": "09:00",
+      "end_time": "11:00",
+      "planned_topic_id": 704,
+      "status": "scheduled",
+      "is_ad_hoc": false
+    },
+    {
+      "id": 906,
+      "scheduled_date": "2026-11-10",
+      "start_time": "09:00",
+      "end_time": "11:00",
+      "planned_topic_id": 705,
+      "status": "scheduled",
+      "is_ad_hoc": false
+    },
+    {
+      "id": 907,
+      "scheduled_date": "2026-11-17",
+      "start_time": "09:00",
+      "end_time": "11:00",
+      "planned_topic_id": 705,
+      "status": "scheduled",
+      "is_ad_hoc": false
+    },
+    {
+      "id": 908,
+      "scheduled_date": "2026-11-24",
+      "start_time": "09:00",
+      "end_time": "11:00",
+      "planned_topic_id": 706,
+      "status": "scheduled",
+      "is_ad_hoc": false
+    }
+  ],
+  "records": [
+    {
+      "client_uuid": "00000000-0000-4000-8000-00000000903",
+      "cohort_session_id": 903,
+      "held_on": "2026-10-20",
+      "started_at": "2026-10-20T09:05:00+02:00",
+      "ended_at": "2026-10-20T10:55:00+02:00",
+      "source": "app",
+      "editable": true,
+      "notes": "",
+      "topics": [
+        {
+          "topic_id": 703,
+          "coverage": "full",
+          "note": null
+        }
+      ],
+      "attendance": [
+        {
+          "enrollment_id": 801,
+          "status": "present",
+          "arrived_at": null,
+          "reason": null,
+          "marked_at": "2026-10-20T09:10:00+02:00"
+        },
+        {
+          "enrollment_id": 802,
+          "status": "present",
+          "arrived_at": null,
+          "reason": null,
+          "marked_at": "2026-10-20T09:10:00+02:00"
+        },
+        {
+          "enrollment_id": 803,
+          "status": "present",
+          "arrived_at": null,
+          "reason": null,
+          "marked_at": "2026-10-20T09:10:00+02:00"
+        },
+        {
+          "enrollment_id": 804,
+          "status": "absent",
+          "arrived_at": null,
+          "reason": null,
+          "marked_at": "2026-10-20T09:10:00+02:00"
+        },
+        {
+          "enrollment_id": 805,
+          "status": "present",
+          "arrived_at": null,
+          "reason": null,
+          "marked_at": "2026-10-20T09:10:00+02:00"
+        },
+        {
+          "enrollment_id": 806,
+          "status": "absent",
+          "arrived_at": null,
+          "reason": null,
+          "marked_at": "2026-10-20T09:10:00+02:00"
+        },
+        {
+          "enrollment_id": 807,
+          "status": "late",
+          "arrived_at": "2026-10-20T09:25:00+02:00",
+          "reason": null,
+          "marked_at": "2026-10-20T09:10:00+02:00"
+        }
+      ]
+    },
+    {
+      "client_uuid": "00000000-0000-4000-8000-00000000902",
+      "cohort_session_id": 902,
+      "held_on": "2026-10-13",
+      "started_at": "2026-10-13T09:05:00+02:00",
+      "ended_at": "2026-10-13T10:55:00+02:00",
+      "source": "app",
+      "editable": true,
+      "notes": "",
+      "topics": [
+        {
+          "topic_id": 702,
+          "coverage": "full",
+          "note": null
+        }
+      ],
+      "attendance": [
+        {
+          "enrollment_id": 801,
+          "status": "present",
+          "arrived_at": null,
+          "reason": null,
+          "marked_at": "2026-10-13T09:10:00+02:00"
+        },
+        {
+          "enrollment_id": 802,
+          "status": "absent",
+          "arrived_at": null,
+          "reason": null,
+          "marked_at": "2026-10-13T09:10:00+02:00"
+        },
+        {
+          "enrollment_id": 803,
+          "status": "present",
+          "arrived_at": null,
+          "reason": null,
+          "marked_at": "2026-10-13T09:10:00+02:00"
+        },
+        {
+          "enrollment_id": 804,
+          "status": "absent",
+          "arrived_at": null,
+          "reason": null,
+          "marked_at": "2026-10-13T09:10:00+02:00"
+        },
+        {
+          "enrollment_id": 805,
+          "status": "present",
+          "arrived_at": null,
+          "reason": null,
+          "marked_at": "2026-10-13T09:10:00+02:00"
+        },
+        {
+          "enrollment_id": 806,
+          "status": "excused",
+          "arrived_at": null,
+          "reason": "Clinic visit",
+          "marked_at": "2026-10-13T09:10:00+02:00"
+        },
+        {
+          "enrollment_id": 807,
+          "status": "present",
+          "arrived_at": null,
+          "reason": null,
+          "marked_at": "2026-10-13T09:10:00+02:00"
+        }
+      ]
+    },
+    {
+      "client_uuid": "00000000-0000-4000-8000-00000000901",
+      "cohort_session_id": 901,
+      "held_on": "2026-10-06",
+      "started_at": "2026-10-06T09:05:00+02:00",
+      "ended_at": "2026-10-06T10:55:00+02:00",
+      "source": "app",
+      "editable": true,
+      "notes": "",
+      "topics": [
+        {
+          "topic_id": 701,
+          "coverage": "full",
+          "note": null
+        }
+      ],
+      "attendance": [
+        {
+          "enrollment_id": 801,
+          "status": "present",
+          "arrived_at": null,
+          "reason": null,
+          "marked_at": "2026-10-06T09:10:00+02:00"
+        },
+        {
+          "enrollment_id": 802,
+          "status": "present",
+          "arrived_at": null,
+          "reason": null,
+          "marked_at": "2026-10-06T09:10:00+02:00"
+        },
+        {
+          "enrollment_id": 803,
+          "status": "present",
+          "arrived_at": null,
+          "reason": null,
+          "marked_at": "2026-10-06T09:10:00+02:00"
+        },
+        {
+          "enrollment_id": 804,
+          "status": "present",
+          "arrived_at": null,
+          "reason": null,
+          "marked_at": "2026-10-06T09:10:00+02:00"
+        },
+        {
+          "enrollment_id": 805,
+          "status": "late",
+          "arrived_at": "2026-10-06T09:25:00+02:00",
+          "reason": null,
+          "marked_at": "2026-10-06T09:10:00+02:00"
+        },
+        {
+          "enrollment_id": 806,
+          "status": "present",
+          "arrived_at": null,
+          "reason": null,
+          "marked_at": "2026-10-06T09:10:00+02:00"
+        },
+        {
+          "enrollment_id": 807,
+          "status": "present",
+          "arrived_at": null,
+          "reason": null,
+          "marked_at": "2026-10-06T09:10:00+02:00"
+        }
+      ]
+    }
+  ],
+  "progress": {
+    "topics_total": 6,
+    "topics_delivered": 3,
+    "delivered_pct": 50.0,
+    "topics_expected": 3,
+    "schedule_status": "on_track",
+    "sessions_scheduled": 8,
+    "sessions_due": 4,
+    "sessions_held": 3,
+    "sessions_behind": 1,
+    "unrecorded_sessions": [
+      {
+        "session_id": 904,
+        "scheduled_date": "2026-10-27"
+      }
+    ],
+    "at_risk": [
+      {
+        "code": "unrecorded_sessions",
+        "value": 1
+      }
+    ]
+  }
+}

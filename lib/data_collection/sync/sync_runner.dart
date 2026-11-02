@@ -5,6 +5,9 @@ import 'package:uuid/uuid.dart';
 import '../../api/api_client.dart';
 import '../../db/database_helper.dart';
 import '../../db/repository.dart';
+import '../../learning/api/learning_api.dart';
+import '../../learning/db/learning_store.dart';
+import '../../learning/sync/learning_sync.dart';
 import '../api/data_collection_api.dart';
 import '../config.dart';
 import '../db/data_collection_store.dart';
@@ -62,7 +65,35 @@ class SyncRunner {
         await ctx.store.markLatestVersions((await ctx.api.syncStatus()).forms);
       } catch (_) {}
     }
-    return report;
+
+    // Course delivery sessions ride the same triggers.
+    final learning = await learningSync();
+    final learningReport = learning == null ? SyncReport.skipped('Not logged in.') : await learning.run(force: force);
+    return _merge(report, learningReport);
+  }
+
+  // Built from storage like the rest of sync, so screens and the background
+  // isolate get the same thing. Null when nobody is logged in.
+  static Future<LearningSync?> learningSync() async {
+    final ctx = await DataCollectionContext.load();
+    if (ctx == null) return null;
+    return LearningSync(
+      store: LearningStore(ctx.store.db),
+      api: createLearningApi(baseUrl: ApiClient.baseUrl, token: await Repository().readToken()),
+      userId: ctx.userId,
+      deviceId: await deviceId(),
+    );
+  }
+
+  static SyncReport _merge(SyncReport a, SyncReport b) {
+    if (a.skipped && b.skipped) return a;
+    return SyncReport(
+      sent: a.sent + b.sent,
+      failed: a.failed + b.failed,
+      pending: a.pending + b.pending,
+      authExpired: a.authExpired || b.authExpired,
+      error: (a.skipped ? null : a.error) ?? (b.skipped ? null : b.error),
+    );
   }
 
   // Pull-to-refresh on the forms list: update the listing, then download
