@@ -28,7 +28,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 5,
+      version: 6,
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) await _createProfilesTable(db);
         if (oldVersion < 4) {
@@ -42,7 +42,14 @@ class DatabaseHelper {
           }
           await createDataCollectionTables(db);
         }
-        if (oldVersion < 5) await createLearningTables(db);
+        if (oldVersion < 6) {
+          // v5 had a first cut of the course tables keyed on server ids; it
+          // never left development, so they are simply rebuilt.
+          for (final t in ['lc_cohorts', 'lc_session_records', 'lc_setup_items']) {
+            await db.execute('DROP TABLE IF EXISTS $t');
+          }
+          await createLearningTables(db);
+        }
       },
       onCreate: (db, version) async {
         await db.execute('''
@@ -193,12 +200,16 @@ Future<void> createDataCollectionTables(Database db) async {
   ''');
 }
 
-// Course delivery (facilitators): cohorts as downloaded from the CRM, and the
-// sessions recorded on this device — which are also the sync queue.
+// Course delivery (teachers/facilitators). Everything is keyed on client_uuid,
+// because a teacher can create a course, class and students offline.
+//  lc_cohorts          classes, as downloaded or as created on this device
+//  lc_session_records  sessions recorded here; also the session sync queue
+//  lc_setup_items      courses/classes/students/enrollments created here,
+//                      waiting to be uploaded (sent before sessions)
 Future<void> createLearningTables(Database db) async {
   await db.execute('''
     CREATE TABLE lc_cohorts (
-      cohortId INTEGER PRIMARY KEY,
+      cohortUuid TEXT PRIMARY KEY,
       ownerUserId INTEGER,
       checksum TEXT,
       json TEXT,
@@ -209,7 +220,7 @@ Future<void> createLearningTables(Database db) async {
   await db.execute('''
     CREATE TABLE lc_session_records (
       clientUuid TEXT PRIMARY KEY,
-      cohortId INTEGER,
+      cohortUuid TEXT,
       cohortSessionId INTEGER,
       heldOn TEXT,
       startedAt TEXT,
@@ -231,4 +242,18 @@ Future<void> createLearningTables(Database db) async {
     )
   ''');
   await db.execute('CREATE INDEX lc_records_owner_status ON lc_session_records (ownerUserId, status)');
+
+  await db.execute('''
+    CREATE TABLE lc_setup_items (
+      clientUuid TEXT PRIMARY KEY,
+      kind TEXT,
+      cohortUuid TEXT,
+      json TEXT,
+      status TEXT,
+      errorReason TEXT,
+      ownerUserId INTEGER,
+      ownerName TEXT,
+      createdAt TEXT
+    )
+  ''');
 }

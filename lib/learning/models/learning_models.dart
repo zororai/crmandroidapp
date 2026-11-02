@@ -1,29 +1,34 @@
 import 'dart:convert';
 
-// Course delivery data as GET /api/v1/learning/cohorts sends it. The cohort
-// is cached as the raw JSON; these wrappers give typed access to it.
+// Course delivery data, in the shape GET /api/v1/learning/cohorts sends it.
+// A class (cohort) is cached as that JSON. Classes, topics and students are
+// identified by client_uuid everywhere in the app: a teacher can create them
+// offline, before the CRM has assigned any ids.
 
 class LearningTopic {
   LearningTopic(this.json);
   final Map<String, dynamic> json;
 
-  int get id => json['id'] as int;
+  String get uuid => json['client_uuid'] as String;
   int get position => json['position'] as int? ?? 0;
   String get title => json['title'] as String? ?? '';
   String? get description => json['description'] as String?;
   int get plannedSessions => json['planned_sessions'] as int? ?? 1;
-  bool get isAssessed => json['is_assessed'] == true;
+  bool get isAssessed => json['is_assessed'] != false;
 }
 
 class LearningStudent {
   LearningStudent(this.json);
   final Map<String, dynamic> json;
 
-  int get enrollmentId => json['enrollment_id'] as int;
+  String get uuid => json['client_uuid'] as String; // the enrollment's client_uuid
   String get name => json['name'] as String? ?? 'Student';
   String? get studentRef => json['student_ref'] as String?;
   String? get gender => json['gender'] as String?;
   int? get age => json['age'] as int?;
+  String? get phone => json['phone_number'] as String?;
+  String? get location => json['location'] as String?;
+  int? get beneficiaryId => json['beneficiary_id'] as int?;
   String get status => json['status'] as String? ?? 'active';
   double? get attendancePct => (json['attendance_pct'] as num?)?.toDouble();
   double? get topicsCoveredPct => (json['topics_covered_pct'] as num?)?.toDouble();
@@ -43,6 +48,7 @@ class PlannedSession {
   String get date => json['scheduled_date'] as String;
   String? get startTime => json['start_time'] as String?;
   String? get endTime => json['end_time'] as String?;
+  String? get plannedTopicUuid => json['planned_topic_client_uuid'] as String?;
   int? get plannedTopicId => json['planned_topic_id'] as int?;
   String get status => json['status'] as String? ?? 'scheduled';
   bool get isAdHoc => json['is_ad_hoc'] == true;
@@ -52,19 +58,28 @@ class LearningCohort {
   LearningCohort(this.json);
   final Map<String, dynamic> json;
 
-  int get id => json['id'] as int;
+  String get uuid => json['client_uuid'] as String;
   String get name => json['name'] as String? ?? '';
   String? get venue => json['venue'] as String?;
+  String? get startDate => json['start_date'] as String?;
+  String? get endDate => json['end_date'] as String?;
   String get status => json['status'] as String? ?? 'running';
   String? get myRole => json['my_role'] as String?;
   String get checksum => json['checksum'] as String? ?? '';
+  // Created on this device and not yet confirmed by the CRM.
+  bool get isLocal => json['local'] == true;
   Map<String, dynamic> get course => (json['course'] as Map?)?.cast<String, dynamic>() ?? const {};
+  String get courseUuid => course['client_uuid'] as String? ?? '';
   String get courseTitle => course['title'] as String? ?? '';
+  String? get courseDescription => course['description'] as String?;
+  bool get canEditCourse => course['can_edit'] == true;
+  bool get canEnrol => myRole == 'lead' || isLocal;
   double? get minAttendancePct => (course['min_attendance_pct'] as num?)?.toDouble();
   Map<String, dynamic> get progress => (json['progress'] as Map?)?.cast<String, dynamic>() ?? const {};
 
   List<LearningTopic> get topics =>
-      ((course['topics'] as List?) ?? const []).cast<Map<String, dynamic>>().map(LearningTopic.new).toList();
+      ((course['topics'] as List?) ?? const []).cast<Map<String, dynamic>>().map(LearningTopic.new).toList()
+        ..sort((a, b) => a.position.compareTo(b.position));
   List<LearningStudent> get roster =>
       ((json['roster'] as List?) ?? const []).cast<Map<String, dynamic>>().map(LearningStudent.new).toList();
   List<PlannedSession> get sessions =>
@@ -73,8 +88,16 @@ class LearningCohort {
   List<Map<String, dynamic>> get serverRecords => ((json['records'] as List?) ?? const []).cast<Map<String, dynamic>>();
   List<Map<String, dynamic>> get topicProgress => ((json['topic_progress'] as List?) ?? const []).cast<Map<String, dynamic>>();
 
-  LearningTopic? topic(int? id) => id == null ? null : topics.where((t) => t.id == id).firstOrNull;
-  LearningStudent? student(int id) => roster.where((s) => s.enrollmentId == id).firstOrNull;
+  LearningTopic? topic(String? uuid) => uuid == null ? null : topics.where((t) => t.uuid == uuid).firstOrNull;
+  LearningStudent? student(String uuid) => roster.where((s) => s.uuid == uuid).firstOrNull;
+
+  // The server identifies planned topics by id; map to the topic's uuid.
+  LearningTopic? plannedTopic(PlannedSession s) =>
+      topic(s.plannedTopicUuid) ?? topics.where((t) => t.json['id'] != null && t.json['id'] == s.plannedTopicId).firstOrNull;
+
+  // Server records/progress use ids; these map them to uuids.
+  String? topicUuidForId(int? id) => topics.where((t) => t.json['id'] != null && t.json['id'] == id).firstOrNull?.uuid;
+  String? studentUuidForId(int? id) => roster.where((s) => s.json['enrollment_id'] != null && s.json['enrollment_id'] == id).firstOrNull?.uuid;
 }
 
 // Local lifecycle, same as data collection:
@@ -86,7 +109,7 @@ enum RecordStatus { draft, finalized, syncing, sent, failed }
 class LocalSessionRecord {
   LocalSessionRecord({
     required this.clientUuid,
-    required this.cohortId,
+    required this.cohortUuid,
     required this.heldOn,
     required this.ownerUserId,
     required this.ownerName,
@@ -108,15 +131,15 @@ class LocalSessionRecord {
         updatedAt = updatedAt ?? DateTime.now();
 
   final String clientUuid;
-  final int cohortId;
+  final String cohortUuid;
   final int? cohortSessionId;
   final String heldOn; // yyyy-MM-dd
   final DateTime? startedAt;
   final DateTime? endedAt;
   final String notes;
-  final List<Map<String, dynamic>> topics; // {topic_id, coverage: full|partial, note}
-  final List<Map<String, dynamic>> attendance; // {enrollment_id, status, arrived_at, reason, marked_at}
-  final List<Map<String, dynamic>> topicProgress; // {enrollment_id, topic_id, status, score}
+  final List<Map<String, dynamic>> topics; // {topic_client_uuid, coverage: full|partial, note}
+  final List<Map<String, dynamic>> attendance; // {enrollment_client_uuid, status, arrived_at, reason, marked_at}
+  final List<Map<String, dynamic>> topicProgress; // {enrollment_client_uuid, topic_client_uuid, status, score}
   final RecordStatus status;
   final String? errorReason;
   final List<Map<String, dynamic>> warnings;
@@ -132,12 +155,11 @@ class LocalSessionRecord {
   bool get isEditable => status != RecordStatus.syncing && status != RecordStatus.sent;
 
   factory LocalSessionRecord.fromRow(Map<String, dynamic> r) {
-    List<Map<String, dynamic>> list(String key) =>
-        ((jsonDecode(r[key] as String? ?? '[]') as List).cast<Map<String, dynamic>>());
+    List<Map<String, dynamic>> list(String key) => (jsonDecode(r[key] as String? ?? '[]') as List).cast<Map<String, dynamic>>();
     DateTime? date(String key) => r[key] == null ? null : DateTime.tryParse(r[key] as String);
     return LocalSessionRecord(
       clientUuid: r['clientUuid'] as String,
-      cohortId: r['cohortId'] as int,
+      cohortUuid: r['cohortUuid'] as String,
       cohortSessionId: r['cohortSessionId'] as int?,
       heldOn: r['heldOn'] as String,
       startedAt: date('startedAt'),
@@ -160,7 +182,7 @@ class LocalSessionRecord {
 
   Map<String, dynamic> toRow() => {
         'clientUuid': clientUuid,
-        'cohortId': cohortId,
+        'cohortUuid': cohortUuid,
         'cohortSessionId': cohortSessionId,
         'heldOn': heldOn,
         'startedAt': startedAt?.toIso8601String(),
@@ -180,10 +202,12 @@ class LocalSessionRecord {
         'updatedAt': updatedAt.toIso8601String(),
       };
 
-  // POST /learning/sessions/batch item.
+  // POST /learning/sessions/batch item. Classes, students and topics go by
+  // client_uuid, which the CRM resolves — so a session recorded in a class
+  // set up offline syncs straight after the class does.
   Map<String, dynamic> toPayload({required String deviceId, required String appVersion}) => {
         'client_uuid': clientUuid,
-        'cohort_id': cohortId,
+        'cohort_client_uuid': cohortUuid,
         'cohort_session_id': cohortSessionId,
         'held_on': heldOn,
         'started_at': startedAt?.toUtc().toIso8601String(),
@@ -204,24 +228,29 @@ class LearningBatchResult {
   final Map<String, dynamic> json;
 
   String get clientUuid => '${json['client_uuid']}';
+  String get kind => json['kind'] as String? ?? '';
   String get status => json['status'] as String? ?? 'rejected';
   String? get reason => json['reason'] as String?;
+  String? get serverClientUuid => json['server_client_uuid'] as String?;
   bool get retryable => json['retryable'] == true;
   bool get isStored => status == 'accepted' || status == 'duplicate' || status == 'updated';
   List<Map<String, dynamic>> get warnings => ((json['warnings'] as List?) ?? const []).cast<Map<String, dynamic>>();
 }
 
-// Reasons from the server, worded for a facilitator.
+// Reasons from the server, worded for a teacher.
 String describeRejection(String? reason) => switch (reason) {
-      'not_facilitator' => 'You are no longer a facilitator of this cohort.',
-      'unknown_cohort' => 'This cohort no longer exists in the CRM.',
+      'not_facilitator' => 'You are no longer a facilitator of this class.',
+      'not_owner' => 'This course was set up by someone else.',
+      'unknown_cohort' => 'This class does not exist in the CRM.',
+      'unknown_course' => 'The course for this class has not been uploaded.',
+      'unknown_student' => 'This student could not be found in the CRM.',
       'unknown_session' => 'The scheduled session was removed in the CRM.',
-      'foreign_enrollment' => 'A student in this register is not in this cohort any more.',
-      'unknown_topic' => 'A topic in this session is not in the course syllabus any more.',
+      'foreign_enrollment' => 'A student in this register is not in this class (any more).',
+      'unknown_topic' => 'A topic in this session is not in the course (any more).',
       'duplicate_student' => 'A student was marked twice.',
       'future_date' => 'The session date is in the future.',
       'read_only' => 'This session was imported in the CRM and cannot be changed from the app.',
-      'client_uuid_conflict' => 'This record belongs to another cohort.',
+      'client_uuid_conflict' => 'This record clashes with another one in the CRM.',
       'invalid' => 'Some details are invalid.',
       null => 'Rejected by the CRM.',
       _ => reason,

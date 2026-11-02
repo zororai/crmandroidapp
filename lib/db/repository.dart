@@ -252,6 +252,8 @@ class Repository {
       " + (SELECT COUNT(*) FROM dc_submissions WHERE status IN ('finalized', 'syncing')"
       ' AND ownerUserId = (SELECT userId FROM session WHERE id = 1))'
       " + (SELECT COUNT(*) FROM lc_session_records WHERE status IN ('finalized', 'syncing')"
+      ' AND ownerUserId = (SELECT userId FROM session WHERE id = 1))'
+      " + (SELECT COUNT(*) FROM lc_setup_items WHERE status = 'pending'"
       ' AND ownerUserId = (SELECT userId FROM session WHERE id = 1)) as c',
     );
     return Sqflite.firstIntValue(result) ?? 0;

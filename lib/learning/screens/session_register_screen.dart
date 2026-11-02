@@ -25,9 +25,9 @@ const _statuses = [
 // or from a record already on the server to edit it (same client_uuid, so
 // the CRM applies it as an update).
 class SessionRegisterScreen extends StatefulWidget {
-  const SessionRegisterScreen({super.key, required this.cohortId, this.session, this.local, this.serverRecord});
+  const SessionRegisterScreen({super.key, required this.cohortUuid, this.session, this.local, this.serverRecord});
 
-  final int cohortId;
+  final String cohortUuid;
   final PlannedSession? session;
   final LocalSessionRecord? local;
   final Map<String, dynamic>? serverRecord;
@@ -48,10 +48,10 @@ class _SessionRegisterScreenState extends State<SessionRegisterScreen> {
   late String _heldOn;
   DateTime? _startedAt;
   DateTime? _endedAt;
-  final _coverage = <int, String>{}; // topicId → full | partial
-  final _marks = <int, Map<String, dynamic>>{}; // enrollmentId → {status, arrived_at, reason, marked_at}
-  final _progress = <String, Map<String, dynamic>>{}; // "enrollment:topic" → {status, score} — only rows changed here
-  final _reasonControllers = <int, TextEditingController>{};
+  final _coverage = <String, String>{}; // topic uuid → full | partial
+  final _marks = <String, Map<String, dynamic>>{}; // enrollment uuid → {enrollment_client_uuid, status, arrived_at, reason, marked_at}
+  final _progress = <String, Map<String, dynamic>>{}; // "enrollment:topic" uuids → {status, score} — only rows changed here
+  final _reasonControllers = <String, TextEditingController>{};
   final _scoreControllers = <String, TextEditingController>{};
   bool _readOnly = false;
   bool _dirty = false;
@@ -77,7 +77,7 @@ class _SessionRegisterScreenState extends State<SessionRegisterScreen> {
     final user = await _repo.getCurrentUser();
     _userId = user?['userId'] as int? ?? 0;
     _userName = user?['name'] as String? ?? '';
-    final cohort = await _store.cohort(widget.cohortId);
+    final cohort = await _store.cohort(widget.cohortUuid);
 
     final local = widget.local;
     final server = widget.serverRecord;
@@ -90,7 +90,7 @@ class _SessionRegisterScreenState extends State<SessionRegisterScreen> {
       _notes.text = local.notes;
       _fill(local.topics, local.attendance);
       for (final p in local.topicProgress) {
-        _progress['${p['enrollment_id']}:${p['topic_id']}'] = {'status': p['status'], 'score': p['score']};
+        _progress['${p['enrollment_client_uuid']}:${p['topic_client_uuid']}'] = {'status': p['status'], 'score': p['score']};
       }
       _readOnly = !local.isEditable;
     } else if (server != null) {
@@ -111,7 +111,7 @@ class _SessionRegisterScreenState extends State<SessionRegisterScreen> {
         _startedAt = _at(session.date, session.startTime);
         _endedAt = _at(session.date, session.endTime);
       }
-      final planned = session?.plannedTopicId;
+      final planned = session == null ? null : cohort?.plannedTopic(session)?.uuid;
       if (planned != null) _coverage[planned] = 'full';
     }
     if (mounted) setState(() => _cohort = cohort);
@@ -119,11 +119,20 @@ class _SessionRegisterScreenState extends State<SessionRegisterScreen> {
 
   void _fill(List<Map<String, dynamic>> topics, List<Map<String, dynamic>> attendance) {
     for (final t in topics) {
-      _coverage[t['topic_id'] as int] = t['coverage'] as String;
+      final uuid = t['topic_client_uuid'] as String?;
+      if (uuid != null) _coverage[uuid] = t['coverage'] as String;
     }
     for (final a in attendance) {
-      _marks[a['enrollment_id'] as int] = Map<String, dynamic>.of(a);
-      _reasonControllers[a['enrollment_id'] as int] = TextEditingController(text: a['reason'] as String? ?? '');
+      final uuid = a['enrollment_client_uuid'] as String?;
+      if (uuid == null) continue;
+      _marks[uuid] = {
+        'enrollment_client_uuid': uuid,
+        'status': a['status'],
+        'arrived_at': a['arrived_at'],
+        'reason': a['reason'],
+        'marked_at': a['marked_at'],
+      };
+      _reasonControllers[uuid] = TextEditingController(text: a['reason'] as String? ?? '');
     }
   }
 
@@ -139,11 +148,11 @@ class _SessionRegisterScreenState extends State<SessionRegisterScreen> {
     });
   }
 
-  void _mark(int enrollmentId, String status) => _changed(() {
+  void _mark(String enrollmentUuid, String status) => _changed(() {
         final now = DateTime.now();
-        final current = _marks[enrollmentId];
-        _marks[enrollmentId] = {
-          'enrollment_id': enrollmentId,
+        final current = _marks[enrollmentUuid];
+        _marks[enrollmentUuid] = {
+          'enrollment_client_uuid': enrollmentUuid,
           'status': status,
           'arrived_at': status == 'late' ? (current?['arrived_at'] ?? now.toUtc().toIso8601String()) : null,
           'reason': (status == 'absent' || status == 'excused') ? (current?['reason']) : null,
@@ -154,7 +163,7 @@ class _SessionRegisterScreenState extends State<SessionRegisterScreen> {
   void _markAllPresent(List<LearningStudent> students) => _changed(() {
         final now = DateTime.now().toUtc().toIso8601String();
         for (final s in students) {
-          _marks.putIfAbsent(s.enrollmentId, () => {'enrollment_id': s.enrollmentId, 'status': 'present', 'arrived_at': null, 'reason': null, 'marked_at': now});
+          _marks.putIfAbsent(s.uuid, () => {'enrollment_client_uuid': s.uuid, 'status': 'present', 'arrived_at': null, 'reason': null, 'marked_at': now});
         }
       });
 
@@ -173,8 +182,8 @@ class _SessionRegisterScreenState extends State<SessionRegisterScreen> {
     });
   }
 
-  Future<void> _pickArrival(int enrollmentId) async {
-    final m = _marks[enrollmentId]!;
+  Future<void> _pickArrival(String enrollmentUuid) async {
+    final m = _marks[enrollmentUuid]!;
     final current = DateTime.tryParse(m['arrived_at'] as String? ?? '')?.toLocal() ?? DateTime.now();
     final t = await showTimePicker(context: context, initialTime: TimeOfDay.fromDateTime(current));
     if (t == null) return;
@@ -200,7 +209,7 @@ class _SessionRegisterScreenState extends State<SessionRegisterScreen> {
         _show(problem);
         return false;
       }
-      final unmarked = active.where((s) => !_marks.containsKey(s.enrollmentId)).length;
+      final unmarked = active.where((s) => !_marks.containsKey(s.uuid)).length;
       if (unmarked > 0) {
         final go = await showDialog<bool>(
           context: context,
@@ -227,20 +236,20 @@ class _SessionRegisterScreenState extends State<SessionRegisterScreen> {
     final existing = await _store.record(_uuid);
     await _store.saveRecord(LocalSessionRecord(
       clientUuid: _uuid,
-      cohortId: widget.cohortId,
+      cohortUuid: widget.cohortUuid,
       cohortSessionId: widget.session?.id ?? widget.local?.cohortSessionId ?? (widget.serverRecord?['cohort_session_id'] as int?),
       heldOn: _heldOn,
       startedAt: _startedAt,
       endedAt: _endedAt,
       notes: _notes.text.trim(),
-      topics: [for (final e in _coverage.entries) {'topic_id': e.key, 'coverage': e.value, 'note': null}],
-      // Only students still in the cohort are sent.
-      attendance: _marks.values.where((m) => c.student(m['enrollment_id'] as int)?.isActive ?? false).toList(),
+      topics: [for (final e in _coverage.entries) {'topic_client_uuid': e.key, 'coverage': e.value, 'note': null}],
+      // Only students still in the class are sent.
+      attendance: _marks.values.where((m) => c.student(m['enrollment_client_uuid'] as String)?.isActive ?? false).toList(),
       topicProgress: [
         for (final e in _progress.entries)
           {
-            'enrollment_id': int.parse(e.key.split(':')[0]),
-            'topic_id': int.parse(e.key.split(':')[1]),
+            'enrollment_client_uuid': e.key.split(':')[0],
+            'topic_client_uuid': e.key.split(':')[1],
             'status': e.value['status'],
             'score': e.value['score'],
           },
@@ -324,8 +333,8 @@ class _SessionRegisterScreenState extends State<SessionRegisterScreen> {
   Widget _body(LearningCohort c) {
     final active = c.roster.where((s) => s.isActive).toList()..sort((a, b) => a.name.compareTo(b.name));
     final counts = {for (final s in _statuses) s.$1: _marks.values.where((m) => m['status'] == s.$1).length};
-    final unmarked = active.where((s) => !_marks.containsKey(s.enrollmentId)).length;
-    final assessedCovered = c.topics.where((t) => t.isAssessed && _coverage.containsKey(t.id)).toList();
+    final unmarked = active.where((s) => !_marks.containsKey(s.uuid)).length;
+    final assessedCovered = c.topics.where((t) => t.isAssessed && _coverage.containsKey(t.uuid)).toList();
     final warning = widget.local?.status == RecordStatus.failed ? widget.local!.errorReason : null;
 
     return ListView(
@@ -361,7 +370,7 @@ class _SessionRegisterScreenState extends State<SessionRegisterScreen> {
         ]),
 
         // Topics
-        _section('Topics covered', [
+        _section('Topics taught', [
           for (final t in c.topics)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -380,14 +389,14 @@ class _SessionRegisterScreenState extends State<SessionRegisterScreen> {
                     ButtonSegment(value: 'full', label: Text('Fully')),
                   ],
                   emptySelectionAllowed: true,
-                  selected: {if (_coverage[t.id] != null) _coverage[t.id]!},
+                  selected: {if (_coverage[t.uuid] != null) _coverage[t.uuid]!},
                   onSelectionChanged: _readOnly
                       ? null
                       : (v) => _changed(() {
                             if (v.isEmpty) {
-                              _coverage.remove(t.id);
+                              _coverage.remove(t.uuid);
                             } else {
-                              _coverage[t.id] = v.first;
+                              _coverage[t.uuid] = v.first;
                             }
                           }),
                 ),
@@ -417,8 +426,9 @@ class _SessionRegisterScreenState extends State<SessionRegisterScreen> {
 
         // Assessments
         if (assessedCovered.isNotEmpty)
-          _section('Assessments', [
-            const Text('Record progress for the assessed topics covered in this session.', style: TextStyle(fontSize: 13, color: inkSecondary)),
+          _section('How did each student do?', [
+            const Text('Assess each student on the topics taught in this session: a score out of 100 and where they are with the topic.',
+                style: TextStyle(fontSize: 13, color: inkSecondary)),
             for (final t in assessedCovered) ...[
               const SizedBox(height: 12),
               Text(t.title, style: const TextStyle(fontWeight: FontWeight.w600, color: brandInk)),
@@ -485,9 +495,9 @@ class _SessionRegisterScreenState extends State<SessionRegisterScreen> {
       );
 
   Widget _studentRow(LearningStudent s) {
-    final m = _marks[s.enrollmentId];
+    final m = _marks[s.uuid];
     final status = m?['status'] as String?;
-    final reason = _reasonControllers.putIfAbsent(s.enrollmentId, () => TextEditingController(text: m?['reason'] as String? ?? ''));
+    final reason = _reasonControllers.putIfAbsent(s.uuid, () => TextEditingController(text: m?['reason'] as String? ?? ''));
     final arrived = DateTime.tryParse(m?['arrived_at'] as String? ?? '')?.toLocal();
 
     return Container(
@@ -515,7 +525,7 @@ class _SessionRegisterScreenState extends State<SessionRegisterScreen> {
                     visualDensity: VisualDensity.compact,
                     selectedColor: st.$4.withValues(alpha: 0.25),
                     labelStyle: TextStyle(fontWeight: status == st.$1 ? FontWeight.bold : FontWeight.normal, color: brandInk),
-                    onSelected: _readOnly ? null : (_) => _mark(s.enrollmentId, st.$1),
+                    onSelected: _readOnly ? null : (_) => _mark(s.uuid, st.$1),
                   ),
                 ),
               ),
@@ -524,7 +534,7 @@ class _SessionRegisterScreenState extends State<SessionRegisterScreen> {
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton.icon(
-                onPressed: _readOnly ? null : () => _pickArrival(s.enrollmentId),
+                onPressed: _readOnly ? null : () => _pickArrival(s.uuid),
                 icon: const Icon(Icons.schedule, size: 16),
                 label: Text(arrived == null ? 'Set arrival time' : 'Arrived ${DateFormat('HH:mm').format(arrived)}'),
               ),
@@ -546,8 +556,8 @@ class _SessionRegisterScreenState extends State<SessionRegisterScreen> {
   }
 
   Widget _assessmentRow(LearningCohort c, LearningStudent s, LearningTopic t) {
-    final key = '${s.enrollmentId}:${t.id}';
-    final saved = c.topicProgress.where((p) => p['enrollment_id'] == s.enrollmentId && p['topic_id'] == t.id).firstOrNull;
+    final key = '${s.uuid}:${t.uuid}';
+    final saved = c.topicProgress.where((p) => p['enrollment_client_uuid'] == s.uuid && p['topic_client_uuid'] == t.uuid).firstOrNull;
     final current = _progress[key] ?? saved;
     final status = current?['status'] as String? ?? 'not_started';
     final score = _scoreControllers.putIfAbsent(key, () => TextEditingController(text: current?['score'] == null ? '' : '${current!['score']}'));

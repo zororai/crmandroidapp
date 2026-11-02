@@ -1,5 +1,6 @@
 {
   "id": 7001,
+  "client_uuid": "dddddddd-0000-4000-8000-000000007001",
   "name": "Tailoring — Mbare Demo",
   "venue": "Mbare Community Hall",
   "status": "running",
@@ -9,12 +10,16 @@
   "checksum": "demo-2026-11-02",
   "course": {
     "id": 70,
+    "client_uuid": "dddddddd-0000-4000-8000-000000000070",
     "title": "Tailoring Basics",
+    "description": "Basic tailoring skills for self-employment.",
+    "can_edit": false,
     "code": "TB-DEMO",
     "min_attendance_pct": 75,
     "topics": [
       {
         "id": 701,
+        "client_uuid": "dddddddd-0000-4000-8000-000000000701",
         "position": 1,
         "title": "Introduction and workplace safety",
         "description": null,
@@ -23,6 +28,7 @@
       },
       {
         "id": 702,
+        "client_uuid": "dddddddd-0000-4000-8000-000000000702",
         "position": 2,
         "title": "Taking body measurements",
         "description": null,
@@ -31,6 +37,7 @@
       },
       {
         "id": 703,
+        "client_uuid": "dddddddd-0000-4000-8000-000000000703",
         "position": 3,
         "title": "Pattern drafting basics",
         "description": null,
@@ -39,6 +46,7 @@
       },
       {
         "id": 704,
+        "client_uuid": "dddddddd-0000-4000-8000-000000000704",
         "position": 4,
         "title": "Cutting fabric",
         "description": null,
@@ -47,6 +55,7 @@
       },
       {
         "id": 705,
+        "client_uuid": "dddddddd-0000-4000-8000-000000000705",
         "position": 5,
         "title": "Machine stitching",
         "description": null,
@@ -55,6 +64,7 @@
       },
       {
         "id": 706,
+        "client_uuid": "dddddddd-0000-4000-8000-000000000706",
         "position": 6,
         "title": "Finishing and pressing",
         "description": null,
@@ -66,6 +76,9 @@
   "roster": [
     {
       "enrollment_id": 801,
+      "client_uuid": "dddddddd-0000-4000-8000-000000000801",
+      "phone_number": "0772000801",
+      "location": "Mbare",
       "beneficiary_id": 1801,
       "name": "Rudo Banda",
       "gender": "F",
@@ -82,6 +95,9 @@
     },
     {
       "enrollment_id": 802,
+      "client_uuid": "dddddddd-0000-4000-8000-000000000802",
+      "phone_number": "0772000802",
+      "location": "Mbare",
       "beneficiary_id": 1802,
       "name": "Tendai Moyo",
       "gender": "M",
@@ -98,6 +114,9 @@
     },
     {
       "enrollment_id": 803,
+      "client_uuid": "dddddddd-0000-4000-8000-000000000803",
+      "phone_number": "0772000803",
+      "location": "Mbare",
       "beneficiary_id": 1803,
       "name": "Chipo Dube",
       "gender": "F",
@@ -114,6 +133,9 @@
     },
     {
       "enrollment_id": 804,
+      "client_uuid": "dddddddd-0000-4000-8000-000000000804",
+      "phone_number": "0772000804",
+      "location": "Mbare",
       "beneficiary_id": 1804,
       "name": "Farai Ncube",
       "gender": "M",
@@ -139,6 +161,9 @@
     },
     {
       "enrollment_id": 805,
+      "client_uuid": "dddddddd-0000-4000-8000-000000000805",
+      "phone_number": "0772000805",
+      "location": "Mbare",
       "beneficiary_id": 1805,
       "name": "Nyasha Chirwa",
       "gender": "F",
@@ -155,6 +180,9 @@
     },
     {
       "enrollment_id": 806,
+      "client_uuid": "dddddddd-0000-4000-8000-000000000806",
+      "phone_number": "0772000806",
+      "location": "Mbare",
       "beneficiary_id": 1806,
       "name": "Tatenda Phiri",
       "gender": "M",
@@ -171,6 +199,9 @@
     },
     {
       "enrollment_id": 807,
+      "client_uuid": "dddddddd-0000-4000-8000-000000000807",
+      "phone_number": "0772000807",
+      "location": "Mbare",
       "beneficiary_id": 1807,
       "name": "Ruvimbo Sibanda",
       "gender": "F",
@@ -187,6 +218,9 @@
     },
     {
       "enrollment_id": 808,
+      "client_uuid": "dddddddd-0000-4000-8000-000000000808",
+      "phone_number": "0772000808",
+      "location": "Mbare",
       "beneficiary_id": 1808,
       "name": "Tapiwa Gumbo",
       "gender": "M",
@@ -205,21 +239,27 @@
   "topic_progress": [
     {
       "enrollment_id": 801,
+      "enrollment_client_uuid": "dddddddd-0000-4000-8000-000000000801",
       "topic_id": 702,
+      "topic_client_uuid": "dddddddd-0000-4000-8000-000000000702",
       "status": "completed",
       "score": 78.0,
       "assessed_at": "2026-10-13T10:50:00+02:00"
     },
     {
       "enrollment_id": 803,
+      "enrollment_client_uuid": "dddddddd-0000-4000-8000-000000000803",
       "topic_id": 702,
+      "topic_client_uuid": "dddddddd-0000-4000-8000-000000000702",
       "status": "completed",
       "score": 85.0,
       "assessed_at": "2026-10-13T10:50:00+02:00"
     },
     {
       "enrollment_id": 805,
+      "enrollment_client_uuid": "dddddddd-0000-4000-8000-000000000805",
       "topic_id": 702,
+      "topic_client_uuid": "dddddddd-0000-4000-8000-000000000702",
       "status": "completed",
       "score": 64.5,
       "assessed_at": "2026-10-13T10:50:00+02:00"
@@ -232,6 +272,7 @@
       "start_time": "09:00",
       "end_time": "11:00",
       "planned_topic_id": 701,
+      "planned_topic_client_uuid": "dddddddd-0000-4000-8000-000000000701",
       "status": "held",
       "is_ad_hoc": false
     },
@@ -241,6 +282,7 @@
       "start_time": "09:00",
       "end_time": "11:00",
       "planned_topic_id": 702,
+      "planned_topic_client_uuid": "dddddddd-0000-4000-8000-000000000702",
       "status": "held",
       "is_ad_hoc": false
     },
@@ -250,11 +292,13 @@
       "start_time": "09:00",
       "end_time": "11:00",
       "planned_topic_id": 703,
+      "planned_topic_client_uuid": "dddddddd-0000-4000-8000-000000000703",
       "status": "held",
       "is_ad_hoc": false
     },
     {
       "id": 904,
+      "planned_topic_client_uuid": "dddddddd-0000-4000-8000-000000000703",
       "scheduled_date": "2026-10-27",
       "start_time": "09:00",
       "end_time": "11:00",
@@ -264,6 +308,7 @@
     },
     {
       "id": 905,
+      "planned_topic_client_uuid": "dddddddd-0000-4000-8000-000000000704",
       "scheduled_date": "2026-11-03",
       "start_time": "09:00",
       "end_time": "11:00",
@@ -273,6 +318,7 @@
     },
     {
       "id": 906,
+      "planned_topic_client_uuid": "dddddddd-0000-4000-8000-000000000705",
       "scheduled_date": "2026-11-10",
       "start_time": "09:00",
       "end_time": "11:00",
@@ -282,6 +328,7 @@
     },
     {
       "id": 907,
+      "planned_topic_client_uuid": "dddddddd-0000-4000-8000-000000000705",
       "scheduled_date": "2026-11-17",
       "start_time": "09:00",
       "end_time": "11:00",
@@ -291,6 +338,7 @@
     },
     {
       "id": 908,
+      "planned_topic_client_uuid": "dddddddd-0000-4000-8000-000000000706",
       "scheduled_date": "2026-11-24",
       "start_time": "09:00",
       "end_time": "11:00",
@@ -312,6 +360,7 @@
       "topics": [
         {
           "topic_id": 703,
+          "topic_client_uuid": "dddddddd-0000-4000-8000-000000000703",
           "coverage": "full",
           "note": null
         }
@@ -319,6 +368,7 @@
       "attendance": [
         {
           "enrollment_id": 801,
+          "enrollment_client_uuid": "dddddddd-0000-4000-8000-000000000801",
           "status": "present",
           "arrived_at": null,
           "reason": null,
@@ -326,6 +376,7 @@
         },
         {
           "enrollment_id": 802,
+          "enrollment_client_uuid": "dddddddd-0000-4000-8000-000000000802",
           "status": "present",
           "arrived_at": null,
           "reason": null,
@@ -333,6 +384,7 @@
         },
         {
           "enrollment_id": 803,
+          "enrollment_client_uuid": "dddddddd-0000-4000-8000-000000000803",
           "status": "present",
           "arrived_at": null,
           "reason": null,
@@ -340,6 +392,7 @@
         },
         {
           "enrollment_id": 804,
+          "enrollment_client_uuid": "dddddddd-0000-4000-8000-000000000804",
           "status": "absent",
           "arrived_at": null,
           "reason": null,
@@ -347,6 +400,7 @@
         },
         {
           "enrollment_id": 805,
+          "enrollment_client_uuid": "dddddddd-0000-4000-8000-000000000805",
           "status": "present",
           "arrived_at": null,
           "reason": null,
@@ -354,6 +408,7 @@
         },
         {
           "enrollment_id": 806,
+          "enrollment_client_uuid": "dddddddd-0000-4000-8000-000000000806",
           "status": "absent",
           "arrived_at": null,
           "reason": null,
@@ -361,6 +416,7 @@
         },
         {
           "enrollment_id": 807,
+          "enrollment_client_uuid": "dddddddd-0000-4000-8000-000000000807",
           "status": "late",
           "arrived_at": "2026-10-20T09:25:00+02:00",
           "reason": null,
@@ -380,6 +436,7 @@
       "topics": [
         {
           "topic_id": 702,
+          "topic_client_uuid": "dddddddd-0000-4000-8000-000000000702",
           "coverage": "full",
           "note": null
         }
@@ -387,6 +444,7 @@
       "attendance": [
         {
           "enrollment_id": 801,
+          "enrollment_client_uuid": "dddddddd-0000-4000-8000-000000000801",
           "status": "present",
           "arrived_at": null,
           "reason": null,
@@ -394,6 +452,7 @@
         },
         {
           "enrollment_id": 802,
+          "enrollment_client_uuid": "dddddddd-0000-4000-8000-000000000802",
           "status": "absent",
           "arrived_at": null,
           "reason": null,
@@ -401,6 +460,7 @@
         },
         {
           "enrollment_id": 803,
+          "enrollment_client_uuid": "dddddddd-0000-4000-8000-000000000803",
           "status": "present",
           "arrived_at": null,
           "reason": null,
@@ -408,6 +468,7 @@
         },
         {
           "enrollment_id": 804,
+          "enrollment_client_uuid": "dddddddd-0000-4000-8000-000000000804",
           "status": "absent",
           "arrived_at": null,
           "reason": null,
@@ -415,6 +476,7 @@
         },
         {
           "enrollment_id": 805,
+          "enrollment_client_uuid": "dddddddd-0000-4000-8000-000000000805",
           "status": "present",
           "arrived_at": null,
           "reason": null,
@@ -422,6 +484,7 @@
         },
         {
           "enrollment_id": 806,
+          "enrollment_client_uuid": "dddddddd-0000-4000-8000-000000000806",
           "status": "excused",
           "arrived_at": null,
           "reason": "Clinic visit",
@@ -429,6 +492,7 @@
         },
         {
           "enrollment_id": 807,
+          "enrollment_client_uuid": "dddddddd-0000-4000-8000-000000000807",
           "status": "present",
           "arrived_at": null,
           "reason": null,
@@ -448,6 +512,7 @@
       "topics": [
         {
           "topic_id": 701,
+          "topic_client_uuid": "dddddddd-0000-4000-8000-000000000701",
           "coverage": "full",
           "note": null
         }
@@ -455,6 +520,7 @@
       "attendance": [
         {
           "enrollment_id": 801,
+          "enrollment_client_uuid": "dddddddd-0000-4000-8000-000000000801",
           "status": "present",
           "arrived_at": null,
           "reason": null,
@@ -462,6 +528,7 @@
         },
         {
           "enrollment_id": 802,
+          "enrollment_client_uuid": "dddddddd-0000-4000-8000-000000000802",
           "status": "present",
           "arrived_at": null,
           "reason": null,
@@ -469,6 +536,7 @@
         },
         {
           "enrollment_id": 803,
+          "enrollment_client_uuid": "dddddddd-0000-4000-8000-000000000803",
           "status": "present",
           "arrived_at": null,
           "reason": null,
@@ -476,6 +544,7 @@
         },
         {
           "enrollment_id": 804,
+          "enrollment_client_uuid": "dddddddd-0000-4000-8000-000000000804",
           "status": "present",
           "arrived_at": null,
           "reason": null,
@@ -483,6 +552,7 @@
         },
         {
           "enrollment_id": 805,
+          "enrollment_client_uuid": "dddddddd-0000-4000-8000-000000000805",
           "status": "late",
           "arrived_at": "2026-10-06T09:25:00+02:00",
           "reason": null,
@@ -490,6 +560,7 @@
         },
         {
           "enrollment_id": 806,
+          "enrollment_client_uuid": "dddddddd-0000-4000-8000-000000000806",
           "status": "present",
           "arrived_at": null,
           "reason": null,
@@ -497,6 +568,7 @@
         },
         {
           "enrollment_id": 807,
+          "enrollment_client_uuid": "dddddddd-0000-4000-8000-000000000807",
           "status": "present",
           "arrived_at": null,
           "reason": null,

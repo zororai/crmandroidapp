@@ -10,10 +10,12 @@ import '../db/learning_store.dart';
 import '../models/learning_models.dart';
 import '../widgets/learning_widgets.dart';
 import 'cohort_screen.dart';
+import 'course_editor_screen.dart';
 import 'performance_screen.dart';
 
-// "My courses": the cohorts this facilitator runs, usable offline from the
-// last download. Pull down to refresh from the CRM.
+// Courses: the classes this teacher runs — set up here or in the CRM —
+// usable offline. "New course" creates a course with its topics and the
+// teacher's class on it.
 class CohortsScreen extends StatefulWidget {
   const CohortsScreen({super.key});
 
@@ -24,7 +26,8 @@ class CohortsScreen extends StatefulWidget {
 class _CohortsScreenState extends State<CohortsScreen> {
   final _repo = Repository();
   List<LearningCohort> _cohorts = [];
-  final _unsent = <int, int>{};
+  final _unsent = <String, int>{};
+  Set<String> _awaitingSetup = {};
   bool _loading = true;
   bool _refreshing = false;
 
@@ -39,15 +42,14 @@ class _CohortsScreenState extends State<CohortsScreen> {
     final userId = (await _repo.getCurrentUser())?['userId'] as int? ?? 0;
     final cohorts = await store.cohorts(userId);
     final records = await store.records(ownerUserId: userId);
+    final awaiting = await store.cohortsAwaitingSetup(userId);
     _unsent
       ..clear()
-      ..addAll({
-        for (final c in cohorts)
-          c.id: records.where((r) => r.cohortId == c.id && r.status != RecordStatus.sent).length,
-      });
+      ..addAll({for (final c in cohorts) c.uuid: records.where((r) => r.cohortUuid == c.uuid && r.status != RecordStatus.sent).length});
     if (!mounted) return;
     setState(() {
       _cohorts = cohorts;
+      _awaitingSetup = awaiting;
       _loading = false;
     });
     if (cohorts.isEmpty && refreshIfEmpty) _refresh();
@@ -58,13 +60,13 @@ class _CohortsScreenState extends State<CohortsScreen> {
     try {
       final sync = await SyncRunner.learningSync();
       if (sync == null) throw AuthExpiredException();
+      await sync.uploadSetup();
       await sync.refreshCohorts();
-      // Push anything waiting while we're online anyway.
-      SyncCoordinator.instance.sync();
+      SyncCoordinator.instance.sync(); // send any finished sessions too
     } on AuthExpiredException {
       if (mounted) await promptReauth(context);
     } on ApiException catch (e) {
-      _showMessage(e.transient ? 'Can\'t reach the server — showing the cohorts already on this device.' : e.message);
+      _showMessage(e.transient ? 'Can\'t reach the server — showing the courses on this device.' : e.message);
     } finally {
       if (mounted) setState(() => _refreshing = false);
       await _load();
@@ -81,12 +83,21 @@ class _CohortsScreenState extends State<CohortsScreen> {
     _load();
   }
 
+  Future<void> _newCourse() async {
+    final cohortUuid = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => const CourseEditorScreen()));
+    await _load();
+    if (cohortUuid != null && mounted) {
+      // Straight on to adding students.
+      await _open(CohortScreen(cohortUuid: cohortUuid, startOnStudents: true));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F6F3),
       appBar: AppBar(
-        title: const Text('My Courses'),
+        title: const Text('Courses'),
         backgroundColor: const Color(0xFFF7F6F3),
         surfaceTintColor: Colors.transparent,
         actions: [
@@ -97,6 +108,11 @@ class _CohortsScreenState extends State<CohortsScreen> {
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _newCourse,
+        icon: const Icon(Icons.add),
+        label: const Text('New course'),
+      ),
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: _loading
@@ -105,17 +121,22 @@ class _CohortsScreenState extends State<CohortsScreen> {
                 ? ListView(children: [
                     Padding(
                       padding: const EdgeInsets.all(32),
-                      child: Text(
-                        _refreshing
-                            ? 'Downloading your cohorts…'
-                            : 'No cohorts on this device.\nPull down to download the cohorts you facilitate in the CRM.',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: inkMuted),
-                      ),
+                      child: Column(children: [
+                        const Icon(Icons.school_outlined, size: 48, color: inkMuted),
+                        const SizedBox(height: 12),
+                        Text(
+                          _refreshing
+                              ? 'Looking for your courses…'
+                              : 'No courses yet.\nTap "New course" to set one up: its name, the topics you will teach, '
+                                  'and the students in your class.',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: inkSecondary),
+                        ),
+                      ]),
                     ),
                   ])
                 : ListView.separated(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
                     itemCount: _cohorts.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
                     itemBuilder: (context, i) => _card(_cohorts[i]),
@@ -129,38 +150,44 @@ class _CohortsScreenState extends State<CohortsScreen> {
     final delivered = (progress['delivered_pct'] as num?)?.toDouble();
     final today = DateTime.now().toIso8601String().substring(0, 10);
     final next = c.sessions.where((s) => s.status == 'scheduled' && s.date.compareTo(today) >= 0).firstOrNull;
+    final active = c.roster.where((s) => s.isActive).length;
     final atRisk = c.roster.where((s) => s.isActive && s.atRisk.isNotEmpty).length;
-    final unsent = _unsent[c.id] ?? 0;
+    final unsent = _unsent[c.uuid] ?? 0;
+    final notUploaded = _awaitingSetup.contains(c.uuid);
 
     return Material(
       color: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: hairline)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => _open(CohortScreen(cohortId: c.id)),
+        onTap: () => _open(CohortScreen(cohortUuid: c.uuid)),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(c.name, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: brandInk)),
-              Text([c.courseTitle, if (c.venue != null) c.venue].join(' · '), style: const TextStyle(color: inkSecondary)),
-              const SizedBox(height: 12),
-              Row(children: [
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(value: (delivered ?? 0) / 100, minHeight: 8, backgroundColor: brandPurple.withValues(alpha: 0.12)),
+              Text(c.courseTitle.isEmpty ? c.name : c.courseTitle, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: brandInk)),
+              Text([if (c.courseTitle.isNotEmpty && c.name != c.courseTitle) c.name, if (c.venue != null && c.venue!.isNotEmpty) c.venue, '$active student${active == 1 ? '' : 's'}', '${c.topics.length} topics'].join(' · '),
+                  style: const TextStyle(color: inkSecondary)),
+              if (delivered != null) ...[
+                const SizedBox(height: 12),
+                Row(children: [
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(value: delivered / 100, minHeight: 8, backgroundColor: brandPurple.withValues(alpha: 0.12)),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Text('${pct(delivered)} of syllabus', style: const TextStyle(fontSize: 12, color: inkSecondary)),
-              ]),
+                  const SizedBox(width: 10),
+                  Text('${pct(delivered)} of topics taught', style: const TextStyle(fontSize: 12, color: inkSecondary)),
+                ]),
+              ],
               const SizedBox(height: 10),
               Wrap(spacing: 8, runSpacing: 6, children: [
-                scheduleStatusPill(progress['schedule_status'] as String?),
+                if (notUploaded) const StatusPill(icon: Icons.cloud_upload_outlined, label: 'Not uploaded yet', color: statusWarning),
+                if (progress['schedule_status'] != null) scheduleStatusPill(progress['schedule_status'] as String?),
                 if (atRisk > 0) StatusPill(icon: Icons.warning_amber_rounded, label: '$atRisk at risk', color: statusWarning),
-                if (unsent > 0) StatusPill(icon: Icons.cloud_upload_outlined, label: '$unsent not sent', color: statusWarning),
+                if (unsent > 0) StatusPill(icon: Icons.schedule, label: '$unsent session${unsent == 1 ? '' : 's'} not sent', color: statusWarning),
               ]),
               if (next != null) ...[
                 const SizedBox(height: 10),
@@ -170,7 +197,7 @@ class _CohortsScreenState extends State<CohortsScreen> {
                   Expanded(
                     child: Text(
                       'Next: ${formatDate(next.date)}${next.startTime != null ? ' at ${next.startTime}' : ''}'
-                      '${c.topic(next.plannedTopicId) != null ? ' · ${c.topic(next.plannedTopicId)!.title}' : ''}',
+                      '${c.plannedTopic(next) != null ? ' · ${c.plannedTopic(next)!.title}' : ''}',
                       style: const TextStyle(fontSize: 13, color: inkSecondary),
                       overflow: TextOverflow.ellipsis,
                     ),

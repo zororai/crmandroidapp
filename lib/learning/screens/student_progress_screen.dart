@@ -8,18 +8,25 @@ import '../widgets/learning_widgets.dart';
 // topics covered, assessed progress, completion, at-risk flags), their
 // attendance session by session, and assessed-topic scores.
 class StudentProgressScreen extends StatelessWidget {
-  const StudentProgressScreen({super.key, required this.cohort, required this.student});
+  const StudentProgressScreen({super.key, required this.cohort, required this.student, this.localRecords = const []});
 
   final LearningCohort cohort;
   final LearningStudent student;
+  final List<LocalSessionRecord> localRecords; // sessions taught on this phone
 
   @override
   Widget build(BuildContext context) {
     final s = student;
+    // Sessions on this phone (maybe not in the CRM yet), then the CRM's.
+    final localUuids = localRecords.map((r) => r.clientUuid).toSet();
     final history = [
+      for (final r in localRecords)
+        for (final a in r.attendance)
+          if (a['enrollment_client_uuid'] == s.uuid) (date: r.heldOn, status: a['status'] as String, reason: a['reason'] as String?),
       for (final r in cohort.serverRecords)
-        for (final a in ((r['attendance'] as List?) ?? const []).cast<Map<String, dynamic>>())
-          if (a['enrollment_id'] == s.enrollmentId) (date: r['held_on'] as String, status: a['status'] as String, reason: a['reason'] as String?),
+        if (!localUuids.contains(r['client_uuid']))
+          for (final a in ((r['attendance'] as List?) ?? const []).cast<Map<String, dynamic>>())
+            if (a['enrollment_client_uuid'] == s.uuid) (date: r['held_on'] as String, status: a['status'] as String, reason: a['reason'] as String?),
     ]..sort((a, b) => b.date.compareTo(a.date));
     final assessed = cohort.topics.where((t) => t.isAssessed).toList();
     final min = cohort.minAttendancePct;
@@ -51,13 +58,12 @@ class StudentProgressScreen extends StatelessWidget {
             const _Flag(icon: Icons.workspace_premium_outlined, color: statusGood, text: 'Meets the course completion rule — eligible to complete.'),
           for (final f in s.atRisk) _Flag(icon: Icons.warning_amber_rounded, color: statusWarning, text: riskLabel(f)),
           const SizedBox(height: 12),
-          const Text('Assessed topics', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: brandInk)),
+          const Text('Performance by topic', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: brandInk)),
           const SizedBox(height: 8),
           if (assessed.isEmpty) const Text('This course has no assessed topics.', style: TextStyle(color: inkMuted)),
           for (final t in assessed) _assessment(t),
           const SizedBox(height: 16),
           const Text('Attendance history', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: brandInk)),
-          const Text('Recent sessions recorded in the CRM', style: TextStyle(fontSize: 12, color: inkMuted)),
           const SizedBox(height: 8),
           if (history.isEmpty) const Text('No sessions recorded yet.', style: TextStyle(color: inkMuted)),
           for (final h in history)
@@ -77,7 +83,13 @@ class StudentProgressScreen extends StatelessWidget {
   }
 
   Widget _assessment(LearningTopic t) {
-    final p = cohort.topicProgress.where((p) => p['enrollment_id'] == student.enrollmentId && p['topic_id'] == t.id).firstOrNull;
+    // The latest assessment on this phone wins over the CRM's copy.
+    Map<String, dynamic>? p = cohort.topicProgress.where((p) => p['enrollment_client_uuid'] == student.uuid && p['topic_client_uuid'] == t.uuid).firstOrNull;
+    for (final r in [...localRecords]..sort((a, b) => a.updatedAt.compareTo(b.updatedAt))) {
+      for (final x in r.topicProgress) {
+        if (x['enrollment_client_uuid'] == student.uuid && x['topic_client_uuid'] == t.uuid) p = x;
+      }
+    }
     final status = p?['status'] as String? ?? 'not_started';
     final score = (p?['score'] as num?)?.toDouble();
     return Container(

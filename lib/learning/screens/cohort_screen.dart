@@ -5,16 +5,19 @@ import '../../theme/brand_colors.dart';
 import '../db/learning_store.dart';
 import '../models/learning_models.dart';
 import '../widgets/learning_widgets.dart';
+import 'course_editor_screen.dart';
+import 'enrol_students_screen.dart';
 import 'session_register_screen.dart';
 import 'student_progress_screen.dart';
 
-// One cohort: its sessions (with what has been recorded), its students and
-// the syllabus. "Record session" starts a register for an unscheduled
-// session; tapping a scheduled one records or edits that session.
+// One course/class: its sessions (with what has been recorded), its students
+// and the topics. "Teach a session" opens the register, where attendance,
+// topics taught and each student's assessment are recorded.
 class CohortScreen extends StatefulWidget {
-  const CohortScreen({super.key, required this.cohortId});
+  const CohortScreen({super.key, required this.cohortUuid, this.startOnStudents = false});
 
-  final int cohortId;
+  final String cohortUuid;
+  final bool startOnStudents;
 
   @override
   State<CohortScreen> createState() => _CohortScreenState();
@@ -24,6 +27,7 @@ class _CohortScreenState extends State<CohortScreen> {
   final _repo = Repository();
   LearningCohort? _cohort;
   List<LocalSessionRecord> _local = [];
+  bool _awaitingSetup = false;
 
   @override
   void initState() {
@@ -34,22 +38,25 @@ class _CohortScreenState extends State<CohortScreen> {
   Future<void> _load() async {
     final store = await LearningStore.open();
     final userId = (await _repo.getCurrentUser())?['userId'] as int? ?? 0;
-    final cohort = await store.cohort(widget.cohortId);
-    final local = await store.records(ownerUserId: userId, cohortId: widget.cohortId);
+    final cohort = await store.cohort(widget.cohortUuid);
+    final local = await store.records(ownerUserId: userId, cohortUuid: widget.cohortUuid);
+    final awaiting = (await store.cohortsAwaitingSetup(userId)).contains(widget.cohortUuid);
     if (mounted) {
       setState(() {
         _cohort = cohort;
         _local = local;
+        _awaitingSetup = awaiting;
       });
     }
   }
 
-  Future<void> _openRegister({PlannedSession? session, LocalSessionRecord? local, Map<String, dynamic>? server}) async {
-    await Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => SessionRegisterScreen(cohortId: widget.cohortId, session: session, local: local, serverRecord: server),
-    ));
+  Future<void> _push(Widget screen) async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
     _load();
   }
+
+  Future<void> _openRegister({PlannedSession? session, LocalSessionRecord? local, Map<String, dynamic>? server}) =>
+      _push(SessionRegisterScreen(cohortUuid: widget.cohortUuid, session: session, local: local, serverRecord: server));
 
   @override
   Widget build(BuildContext context) {
@@ -57,26 +64,60 @@ class _CohortScreenState extends State<CohortScreen> {
     if (c == null) {
       return Scaffold(appBar: AppBar(), body: const Center(child: CircularProgressIndicator()));
     }
+    final noStudents = c.roster.where((s) => s.isActive).isEmpty;
     return DefaultTabController(
       length: 3,
+      initialIndex: widget.startOnStudents ? 1 : 0,
       child: Scaffold(
         backgroundColor: const Color(0xFFF7F6F3),
         appBar: AppBar(
-          title: Text(c.name),
+          title: Text(c.courseTitle.isEmpty ? c.name : c.courseTitle),
           backgroundColor: const Color(0xFFF7F6F3),
           surfaceTintColor: Colors.transparent,
+          actions: [
+            if (c.canEditCourse)
+              IconButton(tooltip: 'Edit course and topics', icon: const Icon(Icons.edit_outlined), onPressed: () => _push(CourseEditorScreen(cohort: c))),
+          ],
           bottom: TabBar(tabs: [
             const Tab(text: 'Sessions'),
             Tab(text: 'Students (${c.roster.where((s) => s.isActive).length})'),
-            const Tab(text: 'Syllabus'),
+            Tab(text: 'Topics (${c.topics.length})'),
           ]),
         ),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: () => _openRegister(),
-          icon: const Icon(Icons.add),
-          label: const Text('Record session'),
+        floatingActionButton: Builder(
+          builder: (context) {
+            final tab = DefaultTabController.of(context);
+            return AnimatedBuilder(
+              animation: tab,
+              builder: (context, _) => tab.index == 1 && c.canEnrol
+                  ? FloatingActionButton.extended(
+                      onPressed: () => _push(EnrolStudentsScreen(cohortUuid: c.uuid)),
+                      icon: const Icon(Icons.person_add_alt_1),
+                      label: const Text('Add students'),
+                    )
+                  : FloatingActionButton.extended(
+                      onPressed: noStudents ? () => tab.animateTo(1) : () => _openRegister(),
+                      icon: const Icon(Icons.co_present),
+                      label: Text(noStudents ? 'Add students first' : 'Teach a session'),
+                    ),
+            );
+          },
         ),
-        body: TabBarView(children: [_sessions(c), _students(c), _syllabus(c)]),
+        body: Column(children: [
+          if (_awaitingSetup)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: statusWarning.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
+              child: const Row(children: [
+                Icon(Icons.cloud_upload_outlined, color: statusWarning),
+                SizedBox(width: 10),
+                Expanded(child: Text('Saved on this phone. It will upload to the CRM next time you are online.')),
+              ]),
+            ),
+          Expanded(child: TabBarView(children: [_sessions(c), _students(c), _topics(c)])),
+        ]),
       ),
     );
   }
@@ -86,39 +127,49 @@ class _CohortScreenState extends State<CohortScreen> {
   Widget _sessions(LearningCohort c) {
     final today = DateTime.now().toIso8601String().substring(0, 10);
     final unscheduled = _local.where((r) => r.cohortSessionId == null).toList();
-    final progress = c.progress;
+    final p = c.progress;
 
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
         children: [
-          _summary(c, progress),
-          const SizedBox(height: 16),
+          if (p.isNotEmpty) ...[_summary(c, p), const SizedBox(height: 16)],
           if (unscheduled.isNotEmpty) ...[
-            const Text('Unscheduled sessions', style: TextStyle(fontWeight: FontWeight.w600, color: brandInk)),
+            const Text('Sessions taught', style: TextStyle(fontWeight: FontWeight.w600, color: brandInk)),
             const SizedBox(height: 8),
-            for (final r in unscheduled) _sessionTile(c, date: r.heldOn, title: 'Unscheduled session', local: r),
+            for (final r in unscheduled) _sessionTile(c, date: r.heldOn, title: _topicsTitle(c, r.topics) ?? 'Session', local: r),
             const SizedBox(height: 16),
           ],
-          const Text('Schedule', style: TextStyle(fontWeight: FontWeight.w600, color: brandInk)),
-          const SizedBox(height: 8),
-          for (final s in c.sessions)
-            _sessionTile(
-              c,
-              date: s.date,
-              title: c.topic(s.plannedTopicId)?.title ?? (s.isAdHoc ? 'Unscheduled session' : 'Session'),
-              time: s.startTime == null ? null : '${s.startTime}${s.endTime != null ? '–${s.endTime}' : ''}',
-              session: s,
-              local: _local.where((r) => r.cohortSessionId == s.id).firstOrNull,
-              server: c.serverRecords.where((r) => r['cohort_session_id'] == s.id).firstOrNull,
-              overdue: s.status == 'scheduled' && s.date.compareTo(today) < 0,
-              future: s.date.compareTo(today) > 0,
+          if (c.sessions.isNotEmpty) ...[
+            const Text('Schedule', style: TextStyle(fontWeight: FontWeight.w600, color: brandInk)),
+            const SizedBox(height: 8),
+            for (final s in c.sessions)
+              _sessionTile(
+                c,
+                date: s.date,
+                title: c.plannedTopic(s)?.title ?? (s.isAdHoc ? 'Session' : 'Scheduled session'),
+                time: s.startTime == null ? null : '${s.startTime}${s.endTime != null ? '–${s.endTime}' : ''}',
+                session: s,
+                local: _local.where((r) => r.cohortSessionId == s.id).firstOrNull,
+                server: c.serverRecords.where((r) => r['cohort_session_id'] == s.id).firstOrNull,
+                overdue: s.status == 'scheduled' && s.date.compareTo(today) < 0,
+                future: s.date.compareTo(today) > 0,
+              ),
+          ],
+          if (c.sessions.isEmpty && unscheduled.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(24),
+              child: Text('No sessions yet. Tap "Teach a session" when you start teaching.', textAlign: TextAlign.center, style: TextStyle(color: inkMuted)),
             ),
-          if (c.sessions.isEmpty) const Text('No sessions scheduled yet.', style: TextStyle(color: inkMuted)),
         ],
       ),
     );
+  }
+
+  String? _topicsTitle(LearningCohort c, List<Map<String, dynamic>> topics) {
+    final titles = [for (final t in topics) c.topic(t['topic_client_uuid'] as String?)?.title].whereType<String>().toList();
+    return titles.isEmpty ? null : titles.join(', ');
   }
 
   Widget _summary(LearningCohort c, Map<String, dynamic> p) => Container(
@@ -128,13 +179,13 @@ class _CohortScreenState extends State<CohortScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(children: [
-              Expanded(child: Text(c.courseTitle, style: const TextStyle(fontWeight: FontWeight.w600, color: brandInk))),
+              Expanded(child: Text(c.name, style: const TextStyle(fontWeight: FontWeight.w600, color: brandInk))),
               scheduleStatusPill(p['schedule_status'] as String?),
             ]),
             const SizedBox(height: 12),
             Row(children: [
-              Expanded(child: _figure('${p['topics_delivered'] ?? 0}/${p['topics_total'] ?? c.topics.length}', 'topics delivered')),
-              Expanded(child: _figure('${p['sessions_held'] ?? 0}/${p['sessions_due'] ?? 0}', 'sessions held / due')),
+              Expanded(child: _figure('${p['topics_delivered'] ?? 0}/${p['topics_total'] ?? c.topics.length}', 'topics taught')),
+              Expanded(child: _figure('${p['sessions_held'] ?? 0}', 'sessions held')),
               Expanded(child: _figure('${c.roster.where((s) => s.isActive && s.atRisk.isNotEmpty).length}', 'students at risk')),
             ]),
             for (final flag in ((p['at_risk'] as List?) ?? const []).cast<Map<String, dynamic>>())
@@ -192,8 +243,9 @@ class _CohortScreenState extends State<CohortScreen> {
       onTap = future ? null : () => _openRegister(session: session);
     }
 
-    final marks = (local?.attendance ?? (server?['attendance'] as List?)?.cast<Map<String, dynamic>>() ?? const []);
+    final marks = local?.attendance ?? ((server?['attendance'] as List?) ?? const []).cast<Map<String, dynamic>>();
     final present = marks.where((m) => m['status'] == 'present' || m['status'] == 'late').length;
+    final duration = local?.duration;
 
     return Card(
       elevation: 0,
@@ -204,7 +256,12 @@ class _CohortScreenState extends State<CohortScreen> {
         onTap: onTap,
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, color: brandInk)),
         subtitle: Text(
-          [formatDate(date), if (time != null) time, if (marks.isNotEmpty) '$present/${marks.length} attended'].join(' · '),
+          [
+            formatDate(date),
+            if (time != null) time,
+            if (duration != null) formatDuration(duration),
+            if (marks.isNotEmpty) '$present/${marks.length} attended',
+          ].join(' · '),
           style: const TextStyle(color: inkSecondary),
         ),
         trailing: pill,
@@ -219,6 +276,14 @@ class _CohortScreenState extends State<CohortScreen> {
         if (a.isActive != b.isActive) return a.isActive ? -1 : 1;
         return a.name.compareTo(b.name);
       });
+    if (students.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: Text('No students yet.\nTap "Add students" to enrol your class.', textAlign: TextAlign.center, style: TextStyle(color: inkSecondary)),
+        ),
+      );
+    }
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
       itemCount: students.length,
@@ -231,14 +296,14 @@ class _CohortScreenState extends State<CohortScreen> {
           margin: EdgeInsets.zero,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: hairline)),
           child: ListTile(
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => StudentProgressScreen(cohort: c, student: s))),
+            onTap: () => _push(StudentProgressScreen(cohort: c, student: s, localRecords: _local)),
             leading: CircleAvatar(
               backgroundColor: brandPurple.withValues(alpha: 0.12),
               child: Text(s.name.isEmpty ? '?' : s.name[0], style: const TextStyle(color: brandPurple, fontWeight: FontWeight.bold)),
             ),
             title: Text(s.name, style: TextStyle(fontWeight: FontWeight.w600, color: s.isActive ? brandInk : inkMuted)),
             subtitle: Text(
-              [if (s.studentRef != null) s.studentRef!, if (!s.isActive) s.status, 'Attendance ${pct(s.attendancePct)}'].join(' · '),
+              [if (s.studentRef != null) s.studentRef!, if (!s.isActive) s.status, if (s.attendancePct != null) 'Attendance ${pct(s.attendancePct)}'].join(' · '),
               style: const TextStyle(color: inkSecondary),
             ),
             trailing: s.isActive && s.atRisk.isNotEmpty
@@ -252,15 +317,16 @@ class _CohortScreenState extends State<CohortScreen> {
     );
   }
 
-  // ── Syllabus ──
+  // ── Topics ──
 
-  Widget _syllabus(LearningCohort c) {
-    // Delivered = covered fully in any session (server or this device).
-    final full = <int>{};
-    final partial = <int>{};
+  Widget _topics(LearningCohort c) {
+    // Taught = covered fully in any session (CRM or this phone).
+    final full = <String>{};
+    final partial = <String>{};
     void add(List<Map<String, dynamic>> topics) {
       for (final t in topics) {
-        (t['coverage'] == 'full' ? full : partial).add(t['topic_id'] as int);
+        final uuid = t['topic_client_uuid'] as String?;
+        if (uuid != null) (t['coverage'] == 'full' ? full : partial).add(uuid);
       }
     }
 
@@ -283,8 +349,8 @@ class _CohortScreenState extends State<CohortScreen> {
             child: ListTile(
               leading: CircleAvatar(
                 radius: 16,
-                backgroundColor: full.contains(t.id) ? statusGood.withValues(alpha: 0.15) : brandPurple.withValues(alpha: 0.08),
-                child: full.contains(t.id)
+                backgroundColor: full.contains(t.uuid) ? statusGood.withValues(alpha: 0.15) : brandPurple.withValues(alpha: 0.08),
+                child: full.contains(t.uuid)
                     ? const Icon(Icons.check, size: 18, color: statusGood)
                     : Text('${t.position}', style: const TextStyle(fontSize: 13, color: brandPurple)),
               ),
@@ -293,12 +359,14 @@ class _CohortScreenState extends State<CohortScreen> {
                 [
                   '${t.plannedSessions} session${t.plannedSessions == 1 ? '' : 's'} planned',
                   if (t.isAssessed) 'Assessed',
-                  if (full.contains(t.id)) 'Delivered' else if (partial.contains(t.id)) 'Partly covered' else 'Not yet covered',
+                  if (full.contains(t.uuid)) 'Taught' else if (partial.contains(t.uuid)) 'Partly taught' else 'Not taught yet',
                 ].join(' · '),
                 style: const TextStyle(color: inkSecondary),
               ),
             ),
           ),
+        if (c.canEditCourse)
+          TextButton.icon(onPressed: () => _push(CourseEditorScreen(cohort: c)), icon: const Icon(Icons.add), label: const Text('Add or edit topics')),
       ],
     );
   }
