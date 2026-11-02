@@ -8,6 +8,8 @@ import '../data_collection/screens/forms_list_screen.dart';
 import '../data_collection/screens/submissions_screen.dart';
 import '../data_collection/screens/sync_status_screen.dart';
 import '../db/repository.dart';
+import '../learning/screens/cohorts_screen.dart';
+import '../learning/screens/performance_screen.dart';
 import '../screens/profile_screen.dart';
 import '../theme/brand_colors.dart';
 
@@ -59,12 +61,14 @@ class _AppDrawerState extends State<AppDrawer> {
 
     final Widget? screen = switch (index) {
       1 => const ProfileScreen(),
-      2 => const FormsListScreen(),
-      3 => const SubmissionsScreen(),
-      4 => const SyncStatusScreen(),
+      2 => const CohortsScreen(),
+      3 => const PerformanceScreen(),
+      4 => const FormsListScreen(),
+      5 => const SubmissionsScreen(),
+      6 => const SyncStatusScreen(),
       _ => null,
     };
-    if (index == 5) {
+    if (index == 7) {
       await _confirmLogout(navigator.context);
       return;
     }
@@ -124,6 +128,17 @@ class _AppDrawerState extends State<AppDrawer> {
           icon: Icon(Icons.badge_outlined),
           selectedIcon: Icon(Icons.badge),
           label: Text('Beneficiary profile'),
+        ),
+        _sectionLabel('Courses'),
+        const NavigationDrawerDestination(
+          icon: Icon(Icons.school_outlined),
+          selectedIcon: Icon(Icons.school),
+          label: Text('My courses'),
+        ),
+        const NavigationDrawerDestination(
+          icon: Icon(Icons.insights_outlined),
+          selectedIcon: Icon(Icons.insights),
+          label: Text('My performance'),
         ),
         _sectionLabel('Data collection'),
         const NavigationDrawerDestination(

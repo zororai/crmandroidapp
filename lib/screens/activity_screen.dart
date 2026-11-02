@@ -10,6 +10,8 @@ import '../data_collection/screens/submissions_screen.dart';
 import '../data_collection/screens/sync_ui.dart';
 import '../data_collection/sync/sync_coordinator.dart';
 import '../db/repository.dart';
+import '../learning/screens/cohorts_screen.dart';
+import '../learning/screens/performance_screen.dart';
 import '../theme/brand_colors.dart';
 import '../widgets/app_drawer.dart';
 import 'capture_screen.dart';
@@ -279,10 +281,12 @@ class _ActivityScreenState extends State<ActivityScreen> {
   }
 
   Widget _quickActions() => _grid([
+        _ActionCard(icon: Icons.school, label: 'My courses', onTap: () => _push(const CohortsScreen())),
         _ActionCard(icon: Icons.how_to_reg, label: 'New attendance register', onTap: _newRegister),
         _ActionCard(icon: Icons.badge, label: 'New beneficiary profile', onTap: () => _push(const ProfileScreen())),
         _ActionCard(icon: Icons.assignment, label: 'Fill a form', onTap: () => _push(const FormsListScreen())),
         _ActionCard(icon: Icons.inbox, label: 'My submissions', onTap: () => _push(const SubmissionsScreen())),
+        _ActionCard(icon: Icons.insights, label: 'My performance', onTap: () => _push(const PerformanceScreen())),
       ], height: 116);
 
   // Two columns on phones, four on wide screens (tablets, Chrome). Fixed
