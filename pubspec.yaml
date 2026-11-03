@@ -26,6 +26,7 @@ dependencies:
   flutter_secure_storage: ^11.2.0
 
 dev_dependencies:
+  flutter_launcher_icons: ^0.14.4
   flutter_test:
     sdk: flutter
 
@@ -36,3 +37,18 @@ flutter:
     - assets/images/logo.png
     - assets/data_collection/household_survey.json
     - assets/learning/demo_cohort.json
+
+# App icon: the Youth Advocates logo. Regenerate with
+#   dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/app_icon.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
+  min_sdk_android: 21
+  web:
+    generate: true
+    image_path: "assets/icon/app_icon.png"
+    background_color: "#FFFFFF"
+    theme_color: "#6A2C91"
