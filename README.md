@@ -16,6 +16,37 @@ For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
 
+## Leave module
+
+Staff apply for leave, see their balances and history, and line managers approve or reject requests. The code is in `lib/leave/`, and it's opened from **My leave** and **Leave approvals** in the menu.
+
+**Setup:** nothing to configure in the app. It uses the CRM's `/api/v1/leave` endpoints with the normal login. On the CRM side, run the migration and `LeaveSeeder`, set each person's supervisor, and tick the leave permissions. See `docs/leave-module.md` in the CRM repo.
+
+The app has no permission logic. Everyone sees the same menus, and the CRM decides what each screen contains:
+
+| Who | What they see |
+|---|---|
+| Any active staff member | Their own balances and requests. They can apply and cancel their own pending requests. **Leave approvals** is empty, and **Team calendar** explains that it is for approvers |
+| Approver (`leave_approve`, and the requester's supervisor in the CRM) | Also their direct reports' pending requests to approve or reject (a comment is required to reject), and their team's calendar |
+| Leave admin (CRM admin or director, or `leave_admin`) | Everyone's pending requests and the whole calendar. Settings, reports and corrections are in the CRM |
+| Deactivated user | Sent back to the login screen, which then refuses them |
+
+**Screens:**
+- **Leave dashboard:** a balance card per leave type.
+- **Apply:** type, date range, a live working-day count from the server, a reason, and an optional photo of a supporting document.
+- **My leave:** history with status chips and a status filter.
+- **Request detail:** a status timeline, and Cancel while pending (or Approve/Reject for an approver).
+- **Approvals.**
+- **Team calendar:** a month grid; tap a day to see who is off.
+
+Every screen has pull-to-refresh, plus loading, empty and error states. A 403 shows the server's explanation instead of an error. Leave needs a connection; nothing is queued offline.
+
+**Attachments:** the app attaches a photo from the camera or gallery. PDFs can only be uploaded through the API, since the app has no file picker.
+
+**Trying it without the CRM:** `flutter run --dart-define=DC_MOCK_API=true` also replaces leave with an in-memory server.
+
+**Tests:** `flutter test test/leave` checks the API client against the CRM's JSON shapes: parsing, 401, 403 and 422 handling, and JSON and multipart applications.
+
 ## Data Collection module
 
 KoboToolbox-style form filling: staff download forms defined in the CRM, fill them in offline, and the app syncs the submissions to the CRM. The code is in `lib/data_collection/`, and it's opened from **Fill Forms** on the home screen.

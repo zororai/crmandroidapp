@@ -10,6 +10,8 @@ import '../data_collection/screens/sync_status_screen.dart';
 import '../db/repository.dart';
 import '../learning/screens/cohorts_screen.dart';
 import '../learning/screens/performance_screen.dart';
+import '../leave/screens/approvals_screen.dart';
+import '../leave/screens/leave_home_screen.dart';
 import '../screens/profile_screen.dart';
 import '../theme/brand_colors.dart';
 
@@ -63,12 +65,14 @@ class _AppDrawerState extends State<AppDrawer> {
       1 => const ProfileScreen(),
       2 => const CohortsScreen(),
       3 => const PerformanceScreen(),
-      4 => const FormsListScreen(),
-      5 => const SubmissionsScreen(),
-      6 => const SyncStatusScreen(),
+      4 => const LeaveHomeScreen(),
+      5 => const ApprovalsScreen(),
+      6 => const FormsListScreen(),
+      7 => const SubmissionsScreen(),
+      8 => const SyncStatusScreen(),
       _ => null,
     };
-    if (index == 7) {
+    if (index == 9) {
       await _confirmLogout(navigator.context);
       return;
     }
@@ -139,6 +143,18 @@ class _AppDrawerState extends State<AppDrawer> {
           icon: Icon(Icons.insights_outlined),
           selectedIcon: Icon(Icons.insights),
           label: Text('My performance'),
+        ),
+        // Same entries for everyone; the CRM decides what each one shows.
+        _sectionLabel('Leave'),
+        const NavigationDrawerDestination(
+          icon: Icon(Icons.beach_access_outlined),
+          selectedIcon: Icon(Icons.beach_access),
+          label: Text('My leave'),
+        ),
+        const NavigationDrawerDestination(
+          icon: Icon(Icons.fact_check_outlined),
+          selectedIcon: Icon(Icons.fact_check),
+          label: Text('Leave approvals'),
         ),
         _sectionLabel('Data collection'),
         const NavigationDrawerDestination(
